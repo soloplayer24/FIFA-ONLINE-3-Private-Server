@@ -268,6 +268,9 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
   HLV ảo làm đối thủ; phòng tự tạo đá vs COM (CLB và cấp độ chọn trong bộ chọn AI, từ Amateur đến Legendary) hoặc
   với một người bạn mà bạn mời từ danh sách. Kết quả được tính là trận giao hữu trong Info Manager, không tính
   vào rating xếp hạng, và đối thủ chat như ở Rank.
+- **Hiệp phụ và đá luân lưu ở Rank và King of the Hill**: hòa sau 90 phút (Rank 1 vs 1, Rank Manager, King of
+  the Hill) thì đá hiệp phụ rồi luân lưu; thắng luân lưu được tính là thắng cho rating, thành tích và phần
+  thưởng trận.
 - **King of the Hill** (issue #36): giải khu vực Esports có một mùa giải mỗi tháng. Chọn một trong 19 vùng của
   Indonesia; bảng xếp hạng của vùng đó gồm các HLV ảo trong vùng, và Mulai cho bạn đá với một người trong số họ
   có rating gần với rating King of the Hill của bạn. Màn hình phần thưởng hiện số điểm được hoặc mất.

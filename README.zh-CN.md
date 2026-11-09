@@ -216,6 +216,8 @@
 - **与 AI 的友谊赛**（issue #36）：Multiple > Persahabatan 的按钮又出现了。Quick match 和 Random match
   会为你找到一位虚拟经理；自建房间可以打 vs COM（AI 选择器中选的俱乐部和等级，Amateur 到 Legendary），
   也可以和你从列表中邀请的好友比赛。结果在 Info Manager 中计为友谊赛，不计入排位评分，对手也会像在排位中那样聊天。
+- **Rank 与 King of the Hill 的加时赛和点球大战**：90 分钟后打平（Rank 1 vs 1、Rank Manager、King of the Hill）
+  会进入加时赛，仍平则点球大战；点球获胜在评分、战绩和比赛奖励中都算胜利。
 - **King of the Hill**（issue #36）：Esports 地区联赛每月一个赛季。从印尼的 19 个地区中选一个；
   该地区的排行榜由当地的虚拟经理组成，按下 Mulai 会与其中一位评分接近你的 King of the Hill 评分的经理比赛。
   奖励界面会显示赢得或失去的点数。

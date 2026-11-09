@@ -292,6 +292,9 @@ Sudah ditambahkan dan lolos tes, tapi belum dicek di client:
   sendiri kamu main vs COM (klub dan level yang dipilih di pemilih AI, Amateur sampai Legendary) atau
   melawan teman yang kamu undang dari daftar. Hasilnya dihitung sebagai pertandingan persahabatan di
   Info Manager, bukan di rating Rank, dan lawan ikut chat seperti di Rank.
+- **Perpanjangan waktu dan adu penalti di Rank dan King of the Hill**: skor imbang setelah 90 menit (Rank
+  1 vs 1, Rank Manager, King of the Hill) lanjut ke perpanjangan waktu lalu adu penalti; menang adu penalti
+  dihitung menang untuk rating, rekor, dan hadiah match.
 - **King of the Hill** (issue #36): liga regional Esports punya musim baru tiap bulan. Pilih satu dari 19
   wilayah Indonesia; papan peringkatnya berisi manajer virtual dari wilayah itu, dan Mulai
   mempertemukanmu dengan salah satu dari mereka yang rating-nya dekat dengan rating King of the Hill-mu.
