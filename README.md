@@ -273,6 +273,9 @@ Added, passing the tests but not yet checked in the client:
   match and Random match find a virtual manager; a custom room plays vs COM (the AI picker's club
   and level, Amateur to Legendary) or a friend you invite from the list. Results count as friendlies
   in Info Manager, not in the Rank rating, and the opponent chats as in Rank.
+- **Extra time and penalties in Rank and King of the Hill**: a level score after 90 minutes (Rank 1 vs 1,
+  Rank Manager, King of the Hill) goes to extra time and then a penalty shootout; a shootout win counts
+  as a win for the rating, the record and the match reward.
 - **King of the Hill** (issue #36): the Esports regional league runs a season every month. Pick one
   of 19 Indonesian regions; its leaderboard holds that region's virtual managers, and Mulai plays
   one of them near your King of the Hill rating. The reward screen shows the points won or lost.

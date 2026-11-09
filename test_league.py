@@ -445,6 +445,7 @@ def main():
         assert m["type"] == "Ladder_MGR_PvP_1v1" and m["id"].isdigit() and user["ip"] and len(user["summary"]["ladderelo"]) == 5
         assert "name" not in him and not m["side"]["right"]["ready"] and m["side"]["left"]["club"] == {"clubname": ""}
         assert all(p["rankedcards"] is None for p in m["side"]["left"]["team"]["players"])  # "Pilihan terbaik"
+        assert m["gamesettings"]["drawMode"] == 1  # a level score: extra time, then penalties
         hc.ladder_squad(m["id"])
         m = hc._state()["match"]
         assert m["stage"] == "squad" and m["side"]["right"]["players"][0]["name"] and m["side"]["right"]["ready"]
@@ -1996,6 +1997,7 @@ def main():
             assert m["type"] == "Regional_League" and hc.vm_region(st["ladder_pending"]["opponent"]) == leaf["id"]
             assert m["side"]["left"]["players"][0]["matchstats"] == [{"type": "Regional_League", "elorating": koth()["elo"]}]
             assert all(c["es2stamina"] == 1 for s_ in m["side"].values() for c in s_["team"]["players"])
+            assert m["gamesettings"]["drawMode"] == 1  # extra time and penalties, as in Rank
             elo0, lad0 = koth()["elo"], copy.deepcopy(hc.my_ladder(st))
             end(3, 0)
             st = hc._state(); rw = st["match"]["reward"]
@@ -2712,6 +2714,12 @@ def main():
         assert {c["itemid"] for c in rw["extra"]["availables"]} <= {hc.EP_ITEM, pid}
         mine = rw["extra"]["availables"][0]  # the opened card is credited
         assert (ep(), items()[0]["remains"]) == ((ep1 + 777, n1) if mine["itemid"] == hc.EP_ITEM else (ep1, n1 + 1))
+        # a shootout decides a level score: won on penalties = the win reward
+        pen = lambda a, b: {"myTeam": "away", "opponentTeam": "home", "home": {"score": 1, "shootout": b}, "away": {"score": 1, "shootout": a}}
+        assert [hc.match_outcome(pen(4, 3)), hc.match_outcome(pen(2, 4)), hc.match_outcome(pen(0, 0))] == [1, -1, 0]
+        cfg2 = A("match_rewards_set", result={**res, "win": {"ep": 9000, "coach": 50, "player": 40}}, cards=cfg["cards"])
+        assert hc.match_reward(copy.deepcopy(hc._state()), pen(5, 4))["money"]["reward"]["total"] == 9000
+        assert A("match_rewards_set", result=res, cards=cfg2["cards"]) == cfg
         assert refused("match_rewards_set", result=res, cards=[[1, 2]]) and refused("match_rewards_set", result=res, cards=[])
         assert refused("match_rewards_set", result={}, cards=[[1, {"ep": 1}]])
         os.remove(hc.MATCH_REWARD_FILE)

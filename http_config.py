@@ -1203,6 +1203,13 @@ def coach_sp_out(coach):
     return {"total": int(sp.get("total", 0)), "used": int(sp.get("used", 0)), "exp": int(sp.get("exp", 0))}
 
 
+def match_outcome(stats):
+    """1 won, 0 drawn, -1 lost for my side of matchStats; a penalty shootout decides a level score."""
+    k = lambda s: tuple(int((stats.get(s) or {}).get(f) or 0) for f in ("score", "shootout"))
+    me, opp = k(stats.get("myTeam", "home")), k(stats.get("opponentTeam", "away"))
+    return (me > opp) - (me < opp)
+
+
 def growth_after_match(st, stats, played=True):
     """match.reward.sp (PostMatchReward setCoachSP: descriptions {record: {count, exp}}, prev and
     current {total, exp}; without it the screen broke with the feature on) and the exp it gives:
@@ -1216,8 +1223,7 @@ def growth_after_match(st, stats, played=True):
     count = lambda v: int(v[0] if isinstance(v, list) and v else v or 0)  # [succeeded, tried] or a count
     desc = {k: {"count": count(side.get(k)), "exp": count(side.get(k)) * e} for k, (_, e) in GROWTH_RECORDS.items()
             if count(side.get(k)) > 0} if played else {}
-    g = lambda s: int((stats.get(s) or {}).get("score") or 0)
-    result = "win" if g(me) > g(opp) else "draw" if g(me) == g(opp) else "lose"
+    result = ("lose", "draw", "win")[match_outcome(stats) + 1]
     if played:
         desc[result] = {"count": 1, "exp": GROWTH_RESULTS[result][1]}
     gain = min(GROWTH_MATCH_LIMIT, sum(d["exp"] for k, d in desc.items() if k in GROWTH_RECORDS)) + \
@@ -3013,10 +3019,7 @@ def match_reward(st, stats, own=True, live=True):
     Credits EP, coach exp and exp for every player of mine in matchStats (in-match spid = the
     card's player id, i.e. spid % 1e6), plus a reward card, and the tactic points of a live match
     of my own side (growth_after_match). ponytail: flat exp by result + goals/assists."""
-    me, opp = stats.get("myTeam", "home"), stats.get("opponentTeam", "away")
-    g = lambda s: int((stats.get(s) or {}).get("score") or 0)
-    won, drew = g(me) > g(opp), g(me) == g(opp)
-    r = match_reward_cfg()["result"]["win" if won else "draw" if drew else "loss"]
+    r = match_reward_cfg()["result"][("loss", "draw", "win")[match_outcome(stats) + 1]]
     ep, cexp, pexp = r["ep"], r["coach"], r["player"]
     boost = club_boosts(st)  # my club's points of this week (issue #36)
     reward = lambda n, kind: {"total": n + round(n * boost.get(kind, 0)), "detail": {"base": n, "extra": round(n * boost.get(kind, 0))}}
@@ -3111,11 +3114,11 @@ def ep_match_end(mid, query, body):
         staff_after_match(st)
         ladder_result(st, mid, req)
         score = lambda side: int((req.get(side) or {}).get("score") or 0)  # missions count it
-        gf, ga = score(req.get("myTeam", "home")), score(req.get("opponentTeam", "away"))
-        rank = str(match.get("type", "")).startswith("Ladder")
-        mission_event(st, match=1, win=int(gf > ga), goal=gf, rank=int(rank), rankwin=int(rank and gf > ga))
+        gf = score(req.get("myTeam", "home"))
+        rank, won = str(match.get("type", "")).startswith("Ladder"), match_outcome(req)
+        mission_event(st, match=1, win=int(won > 0), goal=gf, rank=int(rank), rankwin=int(rank and won > 0))
         mtype = str(match.get("type", ""))
-        club_after_match(st, gf, ga, "RANKED" if rank or mtype == "Regional_League" else "FRIENDLY" if mtype.startswith("Friendly")
+        club_after_match(st, won, "RANKED" if rank or mtype == "Regional_League" else "FRIENDLY" if mtype.startswith("Friendly")
                          else "CUP" if (st.get("cup_pending") or {}).get("id") == mid else "LEAGUE")
     cp = st.get("cup_pending") or {}
     if cp.get("id") == mid and cp.get("cupid") in (st.get("cups") or {}):
@@ -3419,8 +3422,8 @@ def ep_cup_match(cupid, query, body):
     apply_prematch(st, match)
     gs["difficulty"] = cup.get("difficulty", 0)  # AI level 0..4
     if cup["phases"][cup["current"]["phase"]]["system"] == "knock-out":
-        # native maps drawMode 1/2/3 to end rules 9/6/7 (0 = a draw stands). 2 plays extra time
-        # (FIRST_EXTRA_HALF seen in game); a draw after it is settled by cup_play_round
+        # native maps drawMode 1/2/3 to end rules 9/6/7 (0 = a draw stands). 2 (aggregate, prevScore
+        # 0-0) plays extra time and then penalties; cup_play_round settles a level score it never got
         gs["drawMode"] = 2
     st["match"] = match
     st["cup_pending"] = {"id": match["id"], "cupid": cupid, "home": home, "away": away}
@@ -7956,6 +7959,11 @@ def ladder_match(st, room):
         match = new_match("League_2_league_MGR" if i == 3 else "League_2_league", mine, vm_side(vm))
         away = vm["teamid"]
     apply_prematch(st, match)  # the game setting screen's stadium / time / weather / length steppers
+    if kind in ("ladder", "koth"):
+        # a level score goes to extra time, then penalties (Enums.DRAWMODE_EXTRATIME; native end rule
+        # 9: the half-end check plays two extra halves and a shootout if still level). The shootout
+        # comes back as matchStats home/away.shootout (ladder_record / koth_record count it)
+        match["gamesettings"]["drawMode"] = 1
     # Liga levels 10..24 by his rating; vs COM the picker's 0..4 (Amateur..Legendary, the game's own)
     match["gamesettings"]["difficulty"] = (max(0, min(4, int(room["AI"]["index"].get("difficulty") or 0))) if kind == "vscom"
                                            else 10 + min(14, (vm["elo"][i] - LADDER_START) // 55))
@@ -8026,7 +8034,7 @@ def ladder_result(st, mid, req):
     st.pop("ladder_pending")
     VM_CHAT.pop(mid, None)
     if "_id" in vm:  # his word on it once I am back on the Rank screen (vm_say_result)
-        VM_CHAT_AFTER["last"] = {"vm": vm["_id"], "outcome": "win" if theirs > mine else "loss" if mine > theirs else "draw"}
+        VM_CHAT_AFTER["last"] = {"vm": vm["_id"], "outcome": "win" if (theirs, sa) > (mine, sh) else "loss" if (mine, sh) > (theirs, sa) else "draw"}
     if st.get("room"):
         st["room"].update(stage="room", matchmaking=None)
         if "ladder" in st["room"]:
@@ -8587,12 +8595,12 @@ def ep_club_message(query, body):
     return _json({"result": True})
 
 
-def club_after_match(st, gf, ga, act):
+def club_after_match(st, won, act):
     """A match of mine just ended: its activity points, and my club cheers the result."""
     if not st.get("club"):
         return
     club_earn(st, act, {"LEAGUE": "Match_League_league", "CUP": "Match_Cup_PvE"}.get(act, "Match_general"))
-    club_chat_reply(st, "win" if gf > ga else "loss" if gf < ga else "draw", 8, odds=(0.7, 0.2))
+    club_chat_reply(st, ("loss", "draw", "win")[won + 1], 8, odds=(0.7, 0.2))
 
 
 # Global chat (user: "global chat belum ada"): the Chatting window's Channel tab. ChattingController

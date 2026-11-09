@@ -237,6 +237,8 @@ Gudang 등은 게임에 표시되는 화면 이름이라, 게임에서 찾기 �
   상대로 찾아 줌. 직접 만든 방에서는 vs COM(AI 선택창에서 고른 구단과 레벨, Amateur~Legendary)이나 목록에서 초대한
   친구와 경기함. 결과는 Info Manager에 친선전으로 집계되고 랭크 레이팅에는 들어가지 않으며, 상대는 랭크에서처럼
   채팅함.
+- **Rank와 King of the Hill의 연장전과 승부차기**: 90분 후 동점이면(Rank 1 vs 1, Rank Manager, King of the Hill)
+  연장전 후 승부차기로 감. 승부차기 승리는 레이팅, 기록, 경기 보상에서 승리로 계산됨.
 - **King of the Hill**(issue #36): Esports 지역 리그에 매달 새 시즌이 열림. 인도네시아의 19개 지역 중 하나를 고르면 그
   지역의 가상 감독들이 순위표에 나오고, Mulai를 누르면 내 King of the Hill 레이팅에 가까운 감독 중 한 명과 경기함.
   보상 화면에 얻거나 잃은 포인트가 표시됨.
