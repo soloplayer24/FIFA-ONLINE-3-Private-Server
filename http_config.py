@@ -20,7 +20,7 @@ https://APSEODESK172 (port 443) for /info/server/locale etc. — no launch arg
 overrides it — so run `http_config.py 443 --tls` and map APSEODESK172 to
 127.0.0.1 in the hosts file.
 """
-import bisect, calendar, collections, copy, functools, gzip, html, http.server, math, os, random, re, socket, sqlite3, ssl, statistics, sys, threading, time, urllib.parse
+import bisect, calendar, collections, copy, functools, glob, gzip, html, http.server, math, os, random, re, socket, sqlite3, ssl, statistics, sys, threading, time, urllib.parse
 from contextlib import closing
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -2474,10 +2474,42 @@ def ep_l2_achievement(query, body):
 # ({teamid, summary, team}, built by gen_teams.team like the six recommended clubs).
 CLUB_MIN_PLAYERS = 16  # licensed 2017 cards a club needs to be listed
 REST_OF_WORLD = 999998  # FO3's team for players of unlicensed clubs (26 LIVE has 91 such cards): not a club
-_CLUBS = []
+_CLUBS, _CLUBS_KIT = [], []
+
+
+@functools.lru_cache(maxsize=1)
+def kit_teams():
+    """The teamids with a kit in the client (data/sceneassets/kit/kit_<id>_*.rx3 in its data_*.big),
+    or None when the client cannot be read. A match against a club without one crashed the game
+    before it loaded (user: Ansan Greeners; six K League Challenge clubs have none)."""
+    try:
+        if os.path.join(HERE, "tools", "re") not in sys.path:
+            sys.path.insert(0, os.path.join(HERE, "tools", "re"))
+        import bigdir
+        kits = {int(m.group(1)) for big in glob.glob(os.path.join(GAME, "data", "data_*.big"))
+                for n, *_ in bigdir.entries(big) if (m := re.match(r"data/sceneassets/kit/kit_(\d+)_", n))}
+    except Exception as e:
+        print(f"client kits: {e!r}", flush=True)
+        return None
+    return kits or None
+
+
+def has_kit(teamid):
+    kits = kit_teams()
+    return kits is None or int(teamid) in kits
 
 
 def club_index():
+    """all_clubs() without the clubs that have no kit in the client (has_kit): the club picker,
+    Liga, the vs COM picker. A league or nation left empty is left out."""
+    if not _CLUBS_KIT:
+        _CLUBS_KIT[:] = [(n, ls) for n, ls in ((n, [(lid, ts) for lid, ts in ((lid, [t for t in ts if has_kit(t)])
+                                                                             for lid, ts in leagues) if ts])
+                                               for n, leagues in all_clubs()) if ls]
+    return _CLUBS_KIT
+
+
+def all_clubs():
     """[(nationid, [(leagueid, [teamid])])] of clubs with a full 2017 squad, strongest first (by
     their best eleven); a league's nation is its players' most common nationality. National
     teams are league 78 with their players' nationalteamid as the squad (gen_teams.team)."""
@@ -6875,9 +6907,9 @@ def vm_play(vm, sid, d, first, joined=None, hour=None):
 def vm_thirds():
     """Clubs by strength for a manager's club: a beginner gets one from the bottom third of a
     league, intermediate the middle, advanced the top (club_index lists each league's clubs
-    strongest first)."""
+    strongest first). all_clubs, so that a club without a kit only moves its own managers (vm_make)."""
     thirds = ([], [], [])
-    for _, leagues in club_index():
+    for _, leagues in all_clubs():
         for lid, teams in leagues:
             if lid != gen_teams.NATIONAL_LEAGUE:
                 for k, t in enumerate(teams):
@@ -6889,14 +6921,16 @@ def vm_make(rnd, n, name, tier, played=True):
     """Manager n (id vm<n>) of tier `tier` (VM_TIERS), drawn from rnd. played: this season's
     record so far (the first crowd's), else none (a newcomer)."""
     _, grades, levels, ratings = VM_TIERS[tier]
-    thirds = vm_thirds()
+    pool = vm_thirds()[tier] or vm_thirds()[0]
+    # a club without a kit: the next one of its third that has one (no extra draw: the rest stays)
+    kit = lambda t: next((c for c in pool[pool.index(t):] + pool if has_kit(c)), t)
     base = rnd.randint(*ratings)
     elo = [max(1000, base + rnd.randint(-40, 40)) for _ in range(LADDER_COUNT)]
     games = [rnd.randint(10, 60) * (tier + 1) if played else 0 for _ in range(LADDER_COUNT)]
     wins = [round(g * min(0.8, 0.35 + (e - 1000) / 2000)) for g, e in zip(games, elo)]
     forfeits = [rnd.randint(0, g // 25) for g in games]
     return {"_id": f"vm{n:04d}", "name": name, "level": rnd.randint(*levels),
-            "teamid": rnd.choice(thirds[tier] or thirds[0]), "grade": rnd.randint(*grades),
+            "teamid": kit(rnd.choice(pool)), "grade": rnd.randint(*grades),
             "elo": elo, "wins": wins, "forfeits": forfeits,
             "losses": [g - w - f for g, w, f in zip(games, wins, forfeits)]}
 

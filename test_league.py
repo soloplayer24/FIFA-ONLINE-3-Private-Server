@@ -436,6 +436,12 @@ def main():
         # initializeBestRecord reads a division's items[0] and [1] and walks wins until from > totalwins
         assert all(len(d["items"]) >= 2 for d in rewards["divs"])
         assert [w["from"] for w in rewards["wins"]] == sorted(w["from"] for w in rewards["wins"])
+        # a club without a kit in the client crashed the game before the match loaded (Ansan
+        # Greeners): no picker, Liga or virtual manager offers one
+        if hc.kit_teams():
+            assert not hc.has_kit(113595) and hc.has_kit(1476)
+            assert all(hc.has_kit(t) for _, ls in hc.club_index() for _, ts in ls for t in ts)
+            assert all(hc.has_kit(m["teamid"]) for m in hc.virtual_managers())
         # a Rank match: the PvP type, my user as the native session reads it, the opponent left
         # out of that session (nameless, unready) until the squad stage gives him back
         pushed = []  # ladder_found / ladder_squad push to the game over messenger.py: never to a running one
