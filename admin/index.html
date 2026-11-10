@@ -423,6 +423,7 @@
         <label class="f"><span data-i18n="eco_packs"></span><input type="number" id="ecoPacks" min="0.1" max="100" step="0.1"></label>
         <label class="f"><span data-i18n="eco_start"></span><input type="number" id="ecoStart" min="0" step="1000"></label>
         <label class="check"><input type="checkbox" id="ecoDynamic"> <span data-i18n="eco_dynamic"></span></label>
+        <label class="check"><input type="checkbox" id="ecoStrict"> <span data-i18n="eco_strict"></span></label>
         <button class="b primary" id="ecoSave" data-i18n="save"></button>
       </div>
     </section>
@@ -833,7 +834,7 @@ const loaders = {
   async economy() {
     const d = await api("economy");
     $("#ecoPreset").innerHTML = ["custom", "easy", "real", "hard"].map(k => `<option value="${k}">${esc(t("eco_" + k))}</option>`).join("");
-    ecoFill({shopfree: d.shopfree, players: d.players, packs: d.packs, start_ep: d.start_ep, dynamic: d.dynamic});
+    ecoFill({shopfree: d.shopfree, players: d.players, packs: d.packs, start_ep: d.start_ep, dynamic: d.dynamic, strict: d.strict});
     $("#ecoPreset").value = Object.keys(ECO_PRESETS).find(k => JSON.stringify(ECO_PRESETS[k]) === JSON.stringify(ecoRead())) || "custom";
   },
   async chat() {
@@ -1415,18 +1416,19 @@ $("#mrSave").addEventListener("click", () => act(async () => {
 }, t("mr_saved")));
 // the economy presets (issue #30): easy = this server as it always was
 const ECO_PRESETS = {
-  easy: {shopfree: true, players: 1, packs: 1, start_ep: 1000000, dynamic: false},
-  real: {shopfree: false, players: 1, packs: 1, start_ep: 300000, dynamic: true},
-  hard: {shopfree: false, players: 2, packs: 1, start_ep: 100000, dynamic: true},  // packs: their cards x2 already
+  easy: {shopfree: true, players: 1, packs: 1, start_ep: 1000000, dynamic: false, strict: false},
+  real: {shopfree: false, players: 1, packs: 1, start_ep: 300000, dynamic: true, strict: false},  // the game's own rules
+  hard: {shopfree: false, players: 2, packs: 1, start_ep: 100000, dynamic: true, strict: true},  // packs: their cards x2 already
 };
 const ecoRead = () => ({shopfree: $("#ecoShopFree").checked, players: Number($("#ecoPlayers").value),
-  packs: Number($("#ecoPacks").value), start_ep: Number($("#ecoStart").value), dynamic: $("#ecoDynamic").checked});
+  packs: Number($("#ecoPacks").value), start_ep: Number($("#ecoStart").value), dynamic: $("#ecoDynamic").checked,
+  strict: $("#ecoStrict").checked});
 function ecoFill(e) {
   $("#ecoShopFree").checked = e.shopfree; $("#ecoPlayers").value = e.players; $("#ecoPacks").value = e.packs;
-  $("#ecoStart").value = e.start_ep; $("#ecoDynamic").checked = e.dynamic;
+  $("#ecoStart").value = e.start_ep; $("#ecoDynamic").checked = e.dynamic; $("#ecoStrict").checked = e.strict;
 }
 $("#ecoPreset").addEventListener("change", () => { const p = ECO_PRESETS[$("#ecoPreset").value]; if (p) ecoFill(p); });
-["#ecoShopFree", "#ecoPlayers", "#ecoPacks", "#ecoStart", "#ecoDynamic"].forEach(s =>
+["#ecoShopFree", "#ecoPlayers", "#ecoPacks", "#ecoStart", "#ecoDynamic", "#ecoStrict"].forEach(s =>
   $(s).addEventListener("input", () => { $("#ecoPreset").value = "custom"; }));
 $("#ecoSave").addEventListener("click", () => act(async () => {
   await api("economy_set", ecoRead());

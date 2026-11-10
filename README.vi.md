@@ -192,10 +192,12 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
   lâu có người mua hơn), nên mua rẻ bán đắt sẽ có lãi. Các mẫu có sẵn: Dễ (như trước: Shop miễn phí, giá cố
   định), Thực tế (Shop tính phí theo giá trị các thẻ trong gói, Market biến động, 300.000 EP ban đầu) và Khó
   (giá x2, 100.000 EP). EP nhận sau mỗi trận vẫn được chỉnh ở tab Thưởng sau trận.
-  Khi Shop tính phí, không có cách nào tạo EP từ hư không: phí Nâng cấp bằng giá trị trung bình nó thêm vào
-  (khôi phục trả bằng EP), đề nghị của Tukar và Scout không vượt quá giá trị các thẻ đã đưa, phiếu Mô phỏng
-  giải đấu có giá bằng phần thưởng của một vòng, và với Market biến động, giá gói bằng giá trị các thẻ lúc
-  đắt nhất (+13%), vì gói có thể để dành mở vào bất kỳ ngày nào.
+  Khi Shop tính phí, phiếu Mô phỏng giải đấu có giá bằng phần thưởng của một vòng, và với Market biến động,
+  giá gói bằng giá trị các thẻ lúc đắt nhất (+13%), vì gói có thể để dành mở vào bất kỳ ngày nào. Luật chặt
+  (bật ở Khó) khiến Nâng cấp, Tukar và Scout không tạo EP: phí Nâng cấp bằng giá trị trung bình nó thêm vào
+  (khôi phục trả bằng EP), đề nghị của Tukar và Scout không vượt quá giá trị các thẻ đã đưa. Khi tắt (Dễ,
+  Thực tế) dùng luật gốc của game: phí Nâng cấp 2% giá trị thẻ, khôi phục bằng điểm nâng cấp, đề nghị không
+  giới hạn.
   Vật phẩm không chứa EP (tăng tỉ lệ nâng cấp, điểm nâng cấp, viên EXP, đổi tên hoặc đổi đội) có giá cơ bản
   nhân hệ số giá cầu thủ, nên ở mức Khó giá gấp đôi.
   Thay đổi có hiệu lực ngay cả khi game đang chạy: máy chủ báo game bỏ danh sách Shop nó giữ suốt phiên, nên

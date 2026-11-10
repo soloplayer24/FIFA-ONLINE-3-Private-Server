@@ -194,10 +194,12 @@ Added, passing the tests but not yet checked in the client:
   low and selling high pays. Presets: Easy (as before: free Shop, fixed prices), Realistic (a paid
   Shop at the cards' worth, the dynamic Market, 300,000 starting EP) and Hard (prices x2, 100,000
   EP). Match EP stays on the Match rewards tab.
-  While the Shop is paid, nothing makes EP by itself: an Upgrade costs what it adds on average (a
-  restore costs EP), a Tukar or Scout offer is worth at most the cards given, a League Simulation
-  coupon costs what its round pays, and with the dynamic Market a pack costs its cards' worth at
-  their dearest (+13%), as it can be opened on any day.
+  While the Shop is paid, a League Simulation coupon costs what its round pays, and with the dynamic
+  Market a pack costs its cards' worth at their dearest (+13%), as it can be opened on any day. The
+  Strict rules switch (on in Hard) keeps Upgrade, Tukar and Scout from making EP: an Upgrade costs
+  what it adds on average (a restore costs EP), a Tukar or Scout offer is worth at most the cards
+  given. Off (Easy, Realistic) the game's own rules apply: an Upgrade costs 2% of the card's value, a
+  restore takes upgrade points, offers have no cap.
   Items with no EP in them (boosts, upgrade points, EXP capsules, a name or team change) have a set
   price times the player price setting, so Hard doubles it.
   A change reaches a running game: the server tells it to drop the Shop list it keeps for the

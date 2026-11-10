@@ -207,10 +207,12 @@ Sudah ditambahkan dan lolos tes, tapi belum dicek di client:
   itu menguntungkan. Preset: Santai (seperti sebelumnya: Shop gratis, harga tetap), Realistis (Shop
   berbayar seharga nilai kartunya, pasar dinamis, EP awal 300.000), dan Sulit (harga x2,
   EP awal 100.000). EP dari match tetap diatur di tab Hadiah match.
-  Selama Shop berbayar, tidak ada cara mencetak EP: biaya Upgrade sebesar nilai yang rata-rata
-  ditambahkannya (restore dibayar EP), tawaran Tukar dan Scout paling tinggi senilai kartu yang
-  diserahkan, kupon Simulasi Liga seharga hadiah satu rondenya, dan dengan pasar dinamis pak seharga
-  nilai kartunya di harga tertinggi (+13%), karena pak bisa dibuka kapan saja.
+  Selama Shop berbayar, kupon Simulasi Liga seharga hadiah satu rondenya, dan dengan pasar dinamis pak
+  seharga nilai kartunya di harga tertinggi (+13%), karena pak bisa dibuka kapan saja. Pilihan Aturan
+  ketat (aktif di Sulit) membuat Upgrade, Tukar dan Scout tidak mencetak EP: biaya Upgrade sebesar
+  nilai yang rata-rata ditambahkannya (restore dibayar EP), tawaran Tukar dan Scout paling tinggi
+  senilai kartu yang diserahkan. Tanpa itu (Santai, Realistis) berlaku aturan game asli: biaya Upgrade
+  2% dari nilai kartu, restore dengan poin upgrade, tawaran tanpa batas.
   Barang tanpa EP di dalamnya (boost, poin upgrade, kapsul EXP, ganti nama atau tim) punya harga
   dasar dikali pengali harga pemain, jadi di Sulit harganya dua kali lipat.
   Perubahan langsung sampai ke game yang sedang jalan: server menyuruh game membuang daftar Shop yang

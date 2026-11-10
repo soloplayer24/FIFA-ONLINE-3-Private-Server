@@ -1949,12 +1949,15 @@ START_EP = 1000000
 #   dynamic   the Market moves (market_value): a card's price drifts day by day, managers list
 #             bargains and you may ask up to MARKET_ASK_MAX of the price, so buying low and selling
 #             high pays; off = a fixed Market where nothing is gained by trading back and forth
-# With a Shop that costs EP (SHOP_FREE off: EP is scarce) nothing turns EP into more EP: the Shop
-# sells at worth, rounded up (product_price; packs at their cards' dearest swing: pack_worth), an
-# Upgrade costs at least what it adds (enhance_cost; a restore costs EP), a Tukar v2 or Scout
-# offer is worth at most the cards given (trade_cap).
+# A Shop that costs EP (SHOP_FREE off) sells at worth, rounded up (product_price; packs at their
+# cards' dearest swing: pack_worth).
+#   strict    with a paid Shop, nothing turns EP into more EP (strict_economy, Sulit): an Upgrade costs
+#             at least what it adds (enhance_cost; a restore costs EP), a Tukar v2 or Scout offer is
+#             worth at most the cards given (trade_cap). Off (Santai, Realistis): the game's own
+#             rules, a 2% Upgrade fee, a restore for upgrade points, offers without a cap (user:
+#             "harga upgrade pemain terlalu mahal", "ikuti aturan game aslinya saja untuk Realistis")
 ECONOMY_FILE = os.path.join(HERE, "gamedata", "economy.json")
-ECONOMY_DEFAULT = {"players": 1.0, "packs": 1.0, "start_ep": START_EP, "dynamic": False}
+ECONOMY_DEFAULT = {"players": 1.0, "packs": 1.0, "start_ep": START_EP, "dynamic": False, "strict": False}
 
 
 def economy_clean(cfg):
@@ -1967,9 +1970,15 @@ def economy_clean(cfg):
     v = cfg.get("start_ep")
     if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10 ** 12:
         out["start_ep"] = v
-    if isinstance(cfg.get("dynamic"), bool):
-        out["dynamic"] = cfg["dynamic"]
+    for k in ("dynamic", "strict"):
+        if isinstance(cfg.get(k), bool):
+            out[k] = cfg[k]
     return out
+
+
+def strict_economy():
+    """The strict rules (ECONOMY_DEFAULT): on and a Shop that costs EP."""
+    return ECONOMY["strict"] and not SHOP_FREE
 
 
 def load_economy():
@@ -3967,13 +3976,13 @@ def enhance_rate(target, material):
 
 
 def enhance_cost(target, material, rate):
-    """EP for one try: 2% of the target's value (at least 1,000). When EP is scarce (a Shop that
-    costs EP: the Realistis and Sulit economies) at least what the try adds to the card's Market
-    value on average at its odds (rate, boosts included): else the +1..+3 stock, which never runs
-    out, made EP (a +3 tried with a cheap +1 at 74% doubled its money; free boosts did more)."""
+    """EP for one try: 2% of the target's value (at least 1,000). With the strict rules (Sulit) at
+    least what the try adds to the card's Market value on average at its odds (rate, boosts
+    included): else the +1..+3 stock, which never runs out, makes EP (a +3 tried with a cheap +1 at
+    74% doubled its money; free boosts did more), as in the game itself."""
     g = grade_of(target)
     base = max(1000, sig3(card_price(target["spid"], g) // 50))
-    if SHOP_FREE:
+    if not strict_economy():
         return base
     v = lambda x: market_value(target["spid"], x)  # the material is the same player
     fail = g - 1 if g >= ENHANCE_DROP_FROM else g
@@ -4151,7 +4160,7 @@ def ep_enhance25(a, b, use_point, itemid, event, query, body):
     st.pop("enhance_restore", None)
     usepoint = {"currency": "ES", "price": ES_RESTORE * need}
     if grade_of(pa) < before:
-        if not SHOP_FREE:
+        if strict_economy():  # the game's own: upgrade points
             usepoint = {"currency": "EP", "price": nice_ceil(market_value(pa["spid"], before) - market_value(pa["spid"], grade_of(pa)))}
         st["enhance_restore"] = {"id": iid(pa), "grade": before, **usepoint}
     _save(st)
@@ -4357,10 +4366,10 @@ def trade3_pool():
 
 
 def trade_cap(give):
-    """When EP is scarce (a Shop that costs EP), the most a Tukar v2 or Scout offer may be worth,
-    (value, Market value): the given cards' own. Their bonuses and ranges gave back up to about
-    twice, and the best of the offers could be asked again without end. None = no cap."""
-    if SHOP_FREE:
+    """With the strict rules (Sulit), the most a Tukar v2 or Scout offer may be worth, (value,
+    Market value): the given cards' own. Their bonuses and ranges gave back up to about twice, and
+    the best of the offers could be asked again without end. None = no cap (the game's own)."""
+    if not strict_economy():
         return None
     return (sum(card_price(p["spid"], grade_of(p)) for p in give), sum(market_value(p["spid"], grade_of(p)) for p in give))
 

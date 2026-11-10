@@ -34,6 +34,7 @@ def main():
         hc.ECONOMY_FILE = os.path.join(tmp, "economy.json"); hc.ECONOMY = dict(hc.ECONOMY_DEFAULT)  # not the live one
         hc.MATCH_REWARD_FILE = os.path.join(tmp, "match_rewards.json")  # default match rewards; admin test writes here
         hc.MISSIONS_FILE = os.path.join(tmp, "missions.json")  # default missions; admin test writes here
+        hc.VM_GEN_FILE = os.path.join(tmp, "vm_gen.json"); hc.vm_set_generation(0)  # the first crowd, not a regenerated one
         # a fresh account through the client's club creation (the live state may hold no manager)
         hc._save({"coaches": [], "defaultcoachid": "", "teams": {}})
         # issue #42: the boot asks King of the Hill's registrations before any manager exists (the
@@ -2441,7 +2442,7 @@ def main():
         assert refused("economy_set", players=0, packs=1, start_ep=0) and refused("economy_set", players=1, packs="x", start_ep=0)
         n_push = len(pushed)
         r = A("economy_set", players=2, packs=3, start_ep=5000, dynamic=False, shopfree=False)
-        assert r == dict(players=2.0, packs=3.0, start_ep=5000, dynamic=False, shopfree=False) and not hc.SHOP_FREE
+        assert r == dict(players=2.0, packs=3.0, start_ep=5000, dynamic=False, strict=False, shopfree=False) and not hc.SHOP_FREE
         # a running game keeps its Shop list for the whole session: the push makes it ask again, and
         # the game reads /shop/list/clear back and acts only on a new value (issue #30: a preset
         # chosen while the game ran left every price at 0)
@@ -2523,7 +2524,14 @@ def main():
         # turns EP into more EP. An Upgrade's fee takes what the try adds at its odds (boosts too), so
         # buying both cards and selling the result at the band's top never pays (a +3 tried with a +1
         # doubled its money); Easy keeps the 2% fee
+        # (with the strict rules, Sulit; Realistis keeps the game's own: a 2% fee, no offer cap. User:
+        # "harga upgrade pemain terlalu mahal", "ikuti aturan game aslinya saja untuk Realistis")
+        pa, pb = {"spid": 88158023, "grade": 1}, {"spid": 88158023, "grade": 1}
         A("economy_set", players=1, packs=1, start_ep=1000000, dynamic=True, shopfree=False)
+        base = max(1000, hc.sig3(hc.card_price(88158023, 1) // 50))
+        assert hc.enhance_cost(pa, pb, 1.0) == base and hc.trade_cap([pa]) is None and not hc.ECONOMY["strict"]
+        assert A("economy_set", players=1, packs=1, start_ep=1000000, dynamic=True, shopfree=False, strict=True)["strict"]
+        assert hc.enhance_cost(pa, pb, 1.0) > base and hc.trade_cap([pa])
         for s in sorted(hc.market_spids())[::2000][:25]:
             for tg in range(1, 10):
                 for mg in range(tg + 1):
