@@ -1178,9 +1178,10 @@ def label_with_icons(gfx, dds, icons):
     new_defs, x = [], 0
     for season, icon in sorted(icons.items()):
         label = f"{season}season".encode() + b"\0"
+        if any(c == 43 and d == label for sid in ICON_SPRITES for c, d in _tags(sprites[sid][1], 4, len(sprites[sid][1]))):
+            continue  # a game patched before (the season download's Label.big): its icon is there
         for sid in ICON_SPRITES:
             inner = _tags(sprites[sid][1], 4, len(sprites[sid][1]))
-            assert not any(c == 43 and d == label for c, d in inner), f"{season} already in Label.gfx"
             # the '17 frame's shape and its sub-image size
             i = next(k for k, (c, d) in enumerate(inner) if c == 43 and d.startswith(b"17season"))
             place = next(d for c, d in inner[i:] if c == 26)
