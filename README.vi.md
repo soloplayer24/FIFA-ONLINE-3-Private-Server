@@ -289,7 +289,7 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
 - **Tải ảnh còn thiếu từ trang quản trị** (issue #36): tab Aset (Hình ảnh) tải ảnh mặt cầu thủ (ảnh mùa của từng thẻ và ảnh
   của cầu thủ), logo CLB, logo
   giải đấu và ảnh staff còn thiếu từ fifaaddict.com ở chế độ nền (mỗi lần một loại; dừng và tải tiếp lúc nào cũng
-  được). Tab này chạy `tools/fa_faces.py`, công cụ này giờ nhận thêm `--leagues`. "Default ball" trên màn hình
+  được). Tab này chạy `tools/fa_faces.py`, công cụ này giờ nhận thêm `--leagues` và `--uniforms` (ảnh áo đấu ở màn hình chọn CLB, issue #43). "Default ball" trên màn hình
   cài đặt trận hiện quả bóng EA SPORTS, cờ nhỏ dùng ảnh cờ lớn, và các màn hình Cup có cúp và skin riêng.
   Ảnh cầu thủ fifaaddict không có (hoặc từ chối) sẽ lấy từ FC Online (FO4) (cùng player id của EA; cầu thủ mới của
   server lấy ảnh thẻ FO4 từ fifaaddict), việc quét bao gồm mọi thẻ trong cơ sở dữ liệu, khi bị từ chối sẽ chờ lâu hơn rồi

@@ -2871,6 +2871,15 @@ def main():
         # (issue #36, 2026-11-09: "automatically retry failed downloads") it goes on, waiting 10 s more,
         # doubling, up to 5 min; only TRIES refusals in a row end it
         assert waits == [0, 10, 0, 0, 10, 20, 40, 80, 160, 300] and open(os.path.join(fa.EXT, "crests", "large", "s4.png"), "rb").read() == b"\x89PNG crest"
+        # issue #43 ("where to get crest and uniform?"): the club picker's kit pictures, home/away/third of a club
+        real_index, real_asked = fa.hc.club_index, fa._asked
+        fa.hc.club_index, fa._asked = (lambda: [("Italy", [(31, [47, 48])])]), (lambda pattern: [243, 47])
+        try:
+            u = fa.wanted_uniforms()
+        finally:
+            fa.hc.club_index, fa._asked = real_index, real_asked
+        assert [r for r, _ in u[:4]] == ["uniforms/j0_243.png", "uniforms/j1_243.png", "uniforms/j2_243.png", "uniforms/j0_47.png"]
+        assert len(u) == 9 and u[3][1] == fa.FA + "uniforms/j0_47.png" and "uniforms" in admin.ASSET_KINDS
         tries, fa.TRIES, waits[:] = fa.TRIES, 2, []
         fa.urllib.request.urlopen = answer
         try:

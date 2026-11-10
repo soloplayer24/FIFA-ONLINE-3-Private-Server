@@ -295,7 +295,7 @@ Added, passing the tests but not yet checked in the client:
   faces (each card's season picture and the player's), club crests, league logos and staff pictures
   from fifaaddict.com in the background (one
   kind at a time; stop and resume at any time). It runs `tools/fa_faces.py`, which also takes
-  `--leagues` now. The game setting screen's "Default ball" shows the EA SPORTS ball, small flags
+  `--leagues` and `--uniforms` (the club picker's kit pictures, issue #43) now. The game setting screen's "Default ball" shows the EA SPORTS ball, small flags
   use the big ones, and the cup screens get their trophy and skin.
   Player pictures fifaaddict lacks (or refuses) come from FC Online (FO4) instead (same EA player id;
   the server's new players get their FO4 cards' pictures from fifaaddict), the scan covers every card of the DB, a refusal makes it wait longer

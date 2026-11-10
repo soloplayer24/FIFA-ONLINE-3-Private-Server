@@ -316,7 +316,7 @@ Sudah ditambahkan dan lolos tes, tapi belum dicek di client:
   tiap kartu dan foto pemainnya), logo
   klub, logo liga, dan foto staff yang belum ada dari fifaaddict.com di latar belakang (satu jenis dalam
   satu waktu; bisa dihentikan dan dilanjutkan kapan saja). Tab ini menjalankan `tools/fa_faces.py`, yang
-  sekarang juga menerima `--leagues`. "Default ball" di layar pengaturan game menampilkan bola EA SPORTS,
+  sekarang juga menerima `--leagues` dan `--uniforms` (gambar seragam di pemilih klub, issue #43). "Default ball" di layar pengaturan game menampilkan bola EA SPORTS,
   bendera kecil memakai gambar bendera besar, dan layar Cup mendapat trofi dan skin-nya.
   Foto pemain yang tidak ada (atau ditolak) di fifaaddict diambil dari FC Online (FO4) (id pemain EA
   yang sama; pemain baru server dapat gambar kartu FO4-nya dari fifaaddict), pemindaian mencakup semua kartu di database, penolakan
