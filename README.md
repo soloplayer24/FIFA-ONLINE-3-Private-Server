@@ -382,7 +382,7 @@ Added, passing the tests but not yet checked in the client:
   ones from their pictures.
 - **Classic FO3 world** (issue #38): the Database tab's *Dunia game* picks Modern (the AI clubs, the
   club picker and This Season packs use 26 LIVE cards, as before; own seasons also show in the Market
-  search) or Classic FO3: every club plays FO3's own 2017 squad, This Season is '17, and the added seasons
+  search) or Classic FO3: every club plays FO3's own 2017 squad (AC Milan, Genoa, Udinese, Bologna, Cagliari and Sampdoria, which FO3 ID never had, their FO3 cards of every year; issue #43), This Season is '17, and the added seasons
   (25 / 26 LIVE, WC18, own seasons) are in no pack, Market, trade or virtual manager's squad: only the
   admin page gives them. Your club and collection stay as they are, and FO3's own cards are never
   overwritten (new seasons are added next to them). Saved in `gamedata/world.json`; counts after a

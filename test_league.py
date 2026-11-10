@@ -2234,6 +2234,13 @@ def main():
             with hc.closing(hc._db()) as c:
                 madrid = gen_teams.team(c, 243)
             assert {int(p["spid"]) // 1000000 for p in madrid["team"]["players"]} == {gen_teams.LEGACY_SEASON}
+            # issue #43: a club FO3 ID never had (AC Milan) plays FO3's cards of every year in classic, none
+            # added, and is listed when they make a squad
+            with hc.closing(hc._db()) as c:
+                milan = gen_teams.team(c, 47)
+            hc._CLUBS.clear(); hc._CLUBS_KIT.clear()
+            assert bool(milan) == (47 in {t for _, ls in hc.all_clubs() for _, ts in ls for t in ts})
+            assert not milan or not {int(p["spid"]) // 1000000 for p in milan["team"]["players"]} & hc.ADDED_SEASONS
             A("world_set", world="modern")
             gen_teams.WORLD = gen_teams.world()
             modern = {c.spid // 1000000 for cs in hc.vm_card_pool.__wrapped__().values() for c in cs}
@@ -2243,6 +2250,7 @@ def main():
             assert got[:len(base)] == base and {v for e in got[len(base):] for v in e["value"]} <= set(hc.card_seasons())  # no own season here
         finally:
             gen_teams.WORLD_FILE, gen_teams.CURRENT_SEASON, gen_teams.WORLD = kept_world, kept_season, kept_running
+            hc._CLUBS.clear(); hc._CLUBS_KIT.clear()  # the club lists of the running world again
         # King of the Hill's region set (issue #36): Indonesia, Singapore / Malaysia, Thailand, Vietnam
         kept_koth = (hc.KOTH_FILE, hc.KOTH_CUSTOM_FILE)
         hc.KOTH_FILE, hc.KOTH_CUSTOM_FILE = os.path.join(tmp, "koth_admin.json"), os.path.join(tmp, "koth_custom.json")

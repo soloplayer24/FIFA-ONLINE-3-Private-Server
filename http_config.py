@@ -2529,12 +2529,23 @@ def all_clubs():
                                  WHERE p.spid / 1000000 = ?1 OR (p.spid / 1000000 = ?2 AND p.playerid NOT IN
                                        (SELECT playerid FROM players WHERE spid / 1000000 = ?1))""",
                              (gen_teams.CURRENT_SEASON, gen_teams.LEGACY_SEASON)).fetchall()
+            # classic (issue #43): the clubs FO3 ID never had count their FO3 cards of every year, one per
+            # player (gen_teams.team builds their squads the same way); FO3 has a few 2017 cards of theirs
+            open_ = gen_teams.open_clubs() if gen_teams.CURRENT_SEASON == gen_teams.LEGACY_SEASON else []
+            own = c.execute(f"""SELECT p.playerid, p.leagueid, p.teamid, {POSOVR} FROM players p
+                                WHERE p.teamid IN ({",".join(map(str, open_)) or "-1"}) AND p.spid >= 1000000
+                                AND p.spid / 1000000 NOT IN ({",".join(map(str, ADDED_SEASONS))})""").fetchall()
         squads, nats = {}, {}
         for spid, lid, tid, ntid, nat, ovr in rows:
             squads.setdefault((lid, tid), {})[spid] = ovr
             if ntid > 0:  # -1 / 0 = none
                 squads.setdefault((gen_teams.NATIONAL_LEAGUE, ntid), {})[spid] = ovr
             nats.setdefault(lid, collections.Counter())[nat] += 1
+        for k in [k for k in squads if k[1] in open_]:
+            del squads[k]
+        for pid, lid, tid, ovr in own:
+            sq = squads.setdefault((lid, tid), {})
+            sq[-pid] = max(sq.get(-pid, 0), ovr)
         power = {k: sum(sorted(v.values())[-11:]) / 11 for k, v in squads.items()
                  if len(v) >= CLUB_MIN_PLAYERS and k[1] != REST_OF_WORLD}
         leagues = {}

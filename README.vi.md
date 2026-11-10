@@ -370,7 +370,7 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
   cho. *Tạo lại mọi mặt 3D từ ảnh đại diện* làm lại các mặt đã có.
 - **Thế giới FO3 cổ điển** (issue #38): *Dunia game* trong tab Database chọn Hiện đại (CLB AI, phần chọn CLB
   và gói This Season dùng thẻ 26 LIVE, như trước; mùa tự tạo cũng hiện trong tìm kiếm Market) hoặc Cổ điển FO3:
-  mọi CLB dùng đội hình 2017 gốc của FO3, This Season = '17, còn các mùa thêm vào (25 / 26 LIVE, WC18, mùa tự tạo)
+  mọi CLB dùng đội hình 2017 gốc của FO3 (AC Milan, Genoa, Udinese, Bologna, Cagliari và Sampdoria, vốn FO3 ID không có, dùng thẻ FO3 của họ ở mọi năm; issue #43), This Season = '17, còn các mùa thêm vào (25 / 26 LIVE, WC18, mùa tự tạo)
   không có trong gói, Market, giao dịch hay đội hình quản lý ảo: chỉ trang quản trị mới trao được. CLB và bộ sưu
   tập của bạn giữ nguyên, thẻ gốc FO3 không bao giờ bị ghi đè (mùa mới được thêm bên cạnh). Lưu trong
   `gamedata/world.json`; có hiệu lực sau khi khởi động lại (`play.bat`).

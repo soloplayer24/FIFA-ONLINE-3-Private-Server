@@ -404,7 +404,7 @@ Sudah ditambahkan dan lolos tes, tapi belum dicek di client:
   dari ikon* membuat ulang wajah yang sudah ada.
 - **Dunia FO3 klasik** (issue #38): *Dunia game* di tab Database memilih Modern (klub AI, pilihan klub
   dan pak This Season memakai kartu 26 LIVE, seperti sebelumnya; musim buatan juga muncul di pencarian
-  Market) atau Klasik FO3: semua klub memakai skuad 2017 asli FO3, This Season = '17, dan musim tambahan
+  Market) atau Klasik FO3: semua klub memakai skuad 2017 asli FO3 (AC Milan, Genoa, Udinese, Bologna, Cagliari dan Sampdoria, yang tidak pernah ada di FO3 ID, memakai kartu FO3 mereka dari semua tahun; issue #43), This Season = '17, dan musim tambahan
   (25 / 26 LIVE, WC18, musim buatan) tidak ada di pak, Market, Tukar maupun skuad manajer virtual: hanya
   halaman admin yang bisa memberikannya. Klub dan koleksimu tidak berubah, dan kartu asli FO3 tidak pernah
   ditimpa (musim baru ditambahkan di sampingnya). Tersimpan di `gamedata/world.json`; berlaku setelah
