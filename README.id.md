@@ -496,6 +496,16 @@ Belum dikerjakan: main online melawan orang lain (ranked PvP, friendly, King of 
 
 ## Pemasangan
 
+**Paling mudah: setup.exe.** Tutup game lalu jalankan `FO3ID-Server-Setup-<versi>.exe`: ia menanyakan
+folder game FO3 ID, memasang server beserta Python-nya sendiri (ke `C:\FO3ID Server`), membuat
+sertifikat, menambah entri hosts, mengekstrak database pemain, mem-patch game (`installer/setup_pc.py`,
+lognya di `installer/setup.log`) dan membuat shortcut **FO3ID** di desktop: klik dua kali untuk main.
+Tidak ada file game di dalamnya, jadi game harus sudah terpasang; season FO4, karir klub dan wajah 3D
+didapat lewat tools di bawah. Uninstall mengembalikan file asli game. Cara membuatnya:
+`python installer/build.py` (butuh Inno Setup 6; Python dan paketnya diunduh sekali).
+
+Secara manual:
+
 1. Ekstrak database pemain dari client-mu:
    `python extract_fifadb.py D:\FO3ID\32795` → `gamedata/fifadb.sqlite`.
 2. Harga market opsional: `python tools/fa_sync.py` → `gamedata/fa_prices.json` (scraper

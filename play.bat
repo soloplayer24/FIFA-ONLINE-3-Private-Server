@@ -9,8 +9,11 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $
 rem the game gets this server's cards, clubs, 3D faces and patches when they are not in it yet
 rem (another PC, a fresh client, a change on the admin page or in the tools); a minute or two then
 rem (FO3_GAME = the client's folder, default D:\FO3ID\32795)
-python tools\fo4_season.py install --if-needed
-start "FO3ID server" python start_all.py
+rem the Python setup.exe put next to it, else the one on PATH
+set "PY=python"
+if exist "%~dp0python\python.exe" set "PY=%~dp0python\python.exe"
+"%PY%" tools\fo4_season.py install --if-needed
+start "FO3ID server" "%PY%" start_all.py
 timeout /t 4 /nobreak >nul
 rem RunAsInvoker: start the game without the UAC prompt (it runs fine unelevated)
 set __COMPAT_LAYER=RunAsInvoker

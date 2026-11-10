@@ -453,6 +453,15 @@ Chưa làm: chơi online với người khác (xếp hạng PvP, giao hữu, Kin
 
 ## Cài đặt
 
+**Dễ nhất: setup.exe.** Đóng game rồi chạy `FO3ID-Server-Setup-<phiên bản>.exe`: nó hỏi thư mục game
+FO3 ID, cài server kèm Python riêng (vào `C:\FO3ID Server`), tạo chứng chỉ, thêm dòng hosts, trích xuất
+cơ sở dữ liệu cầu thủ, vá game (`installer/setup_pc.py`, nhật ký ở `installer/setup.log`) và tạo lối tắt
+**FO3ID** trên màn hình: nhấp đúp để chơi. Bên trong không có file game nên game phải được cài sẵn; mùa
+FO4, sự nghiệp câu lạc bộ và khuôn mặt 3D có được nhờ các công cụ bên dưới. Gỡ cài đặt sẽ trả lại file
+gốc của game. Cách tạo: `python installer/build.py` (cần Inno Setup 6; Python và các gói chỉ tải một lần).
+
+Cài thủ công:
+
 1. Trích xuất cơ sở dữ liệu cầu thủ từ client của bạn:
    `python extract_fifadb.py D:\FO3ID\32795` → `gamedata/fifadb.sqlite`.
 2. Giá thị trường (tùy chọn): `python tools/fa_sync.py` → `gamedata/fa_prices.json` (lấy dữ liệu từ

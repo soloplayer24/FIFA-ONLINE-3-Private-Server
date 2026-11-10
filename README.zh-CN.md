@@ -359,6 +359,14 @@
 
 ## 安装
 
+**最简单：setup.exe。** 关闭游戏后运行 `FO3ID-Server-Setup-<版本>.exe`：它会询问 FO3 ID 游戏文件夹，连同自带的
+Python 安装服务器（到 `C:\FO3ID Server`），生成证书，添加 hosts 条目，提取球员数据库，为游戏打补丁
+（`installer/setup_pc.py`，日志在 `installer/setup.log`），并在桌面创建 **FO3ID** 快捷方式：双击即可开玩。
+安装包里没有游戏文件，所以游戏必须已经装好；FO4 赛季、俱乐部生涯和 3D 脸型需用下面的工具获取。卸载会还原游戏的
+原始文件。制作方法：`python installer/build.py`（需要 Inno Setup 6；Python 和依赖包只下载一次）。
+
+手动安装：
+
 1. 从你的客户端提取球员数据库：
    `python extract_fifadb.py D:\FO3ID\32795` → `gamedata/fifadb.sqlite`。
 2. 可选的市场价格：`python tools/fa_sync.py` → `gamedata/fa_prices.json`（礼貌抓取 fifaaddict.com；

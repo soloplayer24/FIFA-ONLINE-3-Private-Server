@@ -1778,7 +1778,8 @@ def engine_db(db, meta, game=r"D:\FO3ID\32795"):
     with his own id, height, weight, nationality and foot; rows stay sorted by player id. Then
     the admin page's rows (photo_heads, card_looks)."""
     import struct, eadb
-    heads = {int(k): v for k, v in json.load(open(HEADS)).items()}
+    # none before the first fetch (a fresh install by setup.exe)
+    heads = {int(k): v for k, v in json.load(open(HEADS)).items()} if os.path.isfile(HEADS) else {}
     t, fld, by, i, raws, base = ng_players(db, meta)
     pk = fld["playerid"][0]
     generic = next(r for r in t.rows if t.get(r, fld["headclasscode"][0]) == 1)

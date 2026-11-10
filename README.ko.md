@@ -398,6 +398,15 @@ EALayer3(6.5 MB, `tools/re/ealayer3.py`)로 넣어도, 원본보다 작은 음�
 
 ## 설치
 
+**가장 쉬운 방법: setup.exe.** 게임을 닫고 `FO3ID-Server-Setup-<버전>.exe`를 실행하면 FO3 ID 게임 폴더를 묻고,
+자체 Python과 함께 서버를 설치하고(`C:\FO3ID Server`), 인증서를 만들고, hosts 항목을 추가하고, 선수 데이터베이스를
+추출하고, 게임을 패치한 뒤(`installer/setup_pc.py`, 로그는 `installer/setup.log`) 바탕화면에 **FO3ID** 바로가기를
+만듦: 더블클릭하면 플레이. 게임 파일은 들어 있지 않으므로 게임이 이미 설치되어 있어야 함. FO4 시즌, 클럽 경력,
+3D 얼굴은 아래 도구로 추가. 제거하면 게임 원래 파일이 돌아옴. 만드는 법: `python installer/build.py`
+(Inno Setup 6 필요, Python과 패키지는 처음 한 번 내려받음).
+
+직접 설치:
+
 1. 클라이언트에서 선수 데이터베이스 추출:
    `python extract_fifadb.py D:\FO3ID\32795` → `gamedata/fifadb.sqlite`.
 2. 선택 사항인 시장 가격: `python tools/fa_sync.py` → `gamedata/fa_prices.json`(fifaaddict.com을 예의 있게

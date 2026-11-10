@@ -469,6 +469,17 @@ Not done: online play against other people (ranked PvP, friendly, King of the Hi
 
 ## Setup
 
+**Easiest: setup.exe.** Close the game and run `FO3ID-Server-Setup-<version>.exe`: it asks for the
+FO3 ID game folder, installs the server with a Python of its own (to `C:\FO3ID Server`), makes the
+certificate, adds the hosts entry, extracts the player database, patches the game
+(`installer/setup_pc.py`, its log in `installer/setup.log`) and puts an **FO3ID** shortcut on the
+desktop: double-click it to play. No game files are inside, so the game must be installed already;
+FO4 seasons, club careers and 3D faces come with the tools below. Uninstalling puts the game's
+original files back. To build it: `python installer/build.py` (needs Inno Setup 6; it fetches its own
+Python and packages once).
+
+By hand:
+
 1. Extract the player database from your client:
    `python extract_fifadb.py D:\FO3ID\32795` → `gamedata/fifadb.sqlite`.
 2. Optional market prices: `python tools/fa_sync.py` → `gamedata/fa_prices.json` (polite
