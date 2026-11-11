@@ -37,6 +37,15 @@ Diuji di client asli (UI bahasa Indonesia):
 - Daftar formasi (formasi klub sendiri + 33 formasi umum game, dibaca dari tabel formasi client)
   dan level manager / pemain: EXP setelah tiap pertandingan, pemain LV.1-23 (+1 ke semua atribut
   per level), manager LV.1-100.
+- Issue #44: *Lepas* di daftar pemain melepas kartu untuk selamanya (dulu pemainnya tetap ada; tidak
+  untuk pemain inti, atau kalau pemain tinggal 18); pemain cadangan yang masuk juga dapat EXP (bangku
+  yang tidak main tidak); kotak hadiah jendela Quest menampilkan gambarnya dengan bentuk yang benar
+  (dulu gepeng); team color "Red Day Boost" ("Red Devil" di bahasa Thai) milik Manchester United
+  (kartu '17 / pemain yang sekarang atau dulu di klub itu), dulu didapat semua klub; daftar skuad
+  menampilkan panah form tiap kartu (terbaik sampai terburuk, baru tiap hari jam 00:00 WIB; efek form
+  di pertandingan belum dicek). *Kontrak pemain* (craft FO3) jalan: 30 pemain Legend terbaik, masing-masing
+  untuk 10 player piece-nya, item "Kontrak pemain" (Shop) dan 5% harganya dalam EP; "Kotak player piece"
+  (Shop, dan kartu hadiah pertandingan bawaan; admin bisa memasangnya di hadiah mana pun) berisi 1-3 piece satu pemain.
 - Suara game dan musik menu EA Trax. `tools/eatrax_song.py` menaruh lagumu sendiri di urutan
   pertama, tapi game lalu crash setelah pertandingan (lihat masalah yang diketahui di bawah).
 - Halaman admin web di http://127.0.0.1:8088/ (EP, pemain, pak, hadiah, hadiah harian, hadiah match, pengaturan match, ekonomi, chat AI, Shop, log)

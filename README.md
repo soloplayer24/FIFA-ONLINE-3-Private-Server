@@ -35,6 +35,15 @@ Tested in the real client (Indonesian UI):
 - Formation list (the club's own + the game's 33 common formations, read from the client's
   formations table) and manager / player levels: EXP after every match, player LV.1-23
   (+1 to every attribute per level), manager LV.1-100.
+- Issue #44: *Lepas* in the player list releases a card for good (it stayed in the list; not a
+  starter, nor with 18 players left); subs who came on get match EXP too (the unused bench does not);
+  the Quest window's reward boxes show their pictures in shape (they were stretched); the team colors
+  "Red Day Boost" ("Red Devil" in Thai) are Manchester United's ('17 cards / now or formerly at the
+  club), where every club used to get them; the squad lists show each card's form arrow (best to
+  worst, new every day at 00:00 WIB; what the game does with form in a match is not checked).
+  *Kontrak pemain* (FO3's craft) works: the 30 best Legend players, each for 10 of his player
+  pieces, a "Kontrak pemain" item (Shop) and 5% of his price in EP; a "Kotak player piece" (Shop,
+  and a default match reward card; the admin page can put it in any reward) gives 1-3 pieces of one.
 - Game sound and the EA Trax menu music. `tools/eatrax_song.py` puts your own song first in it,
   but the game then crashes after matches (see the known issue below).
 - Admin web page on http://127.0.0.1:8088/ (EP, players, packs, gifts, daily rewards, match rewards, match settings, economy, AI chat, Shop, log)

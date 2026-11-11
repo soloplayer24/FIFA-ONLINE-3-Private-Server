@@ -39,6 +39,15 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
 - Luôn có VIP + ưu đãi phòng máy chính thức (IGR), xóa / khôi phục HLV, thẻ mùa '17.
 - Danh sách sơ đồ (sơ đồ riêng của CLB + 33 sơ đồ phổ biến của game, đọc từ bảng sơ đồ của client) và
   cấp HLV / cầu thủ: EXP sau mỗi trận, cầu thủ LV.1-23 (+1 mọi chỉ số mỗi cấp), HLV LV.1-100.
+- Issue #44: *Lepas* (giải phóng) trong danh sách cầu thủ xóa thẻ vĩnh viễn (trước đây cầu thủ vẫn còn
+  trong danh sách; không áp dụng cho cầu thủ đá chính hoặc khi chỉ còn 18 cầu thủ); cầu thủ dự bị được
+  tung vào sân cũng nhận EXP (dự bị không ra sân thì không); ô phần thưởng của cửa sổ Quest hiển thị ảnh
+  đúng tỷ lệ (trước bị kéo giãn); team color "Red Day Boost" ("Red Devil" bản tiếng Thái) là của
+  Manchester United (thẻ '17 / cầu thủ đang hoặc từng ở CLB), trước đây CLB nào cũng có; danh sách đội
+  hình hiển thị mũi tên phong độ của từng thẻ (tốt nhất đến tệ nhất, đổi mới mỗi ngày lúc 00:00 WIB; chưa
+  kiểm tra phong độ ảnh hưởng gì trong trận). *Kontrak pemain* (craft của FO3) đã chạy: 30 cầu thủ Legend
+  tốt nhất, mỗi người cần 10 mảnh cầu thủ, vật phẩm "Kontrak pemain" (Shop) và 5% giá thẻ bằng EP; "Kotak player
+  piece" (Shop, thẻ thưởng sau trận mặc định; trang admin có thể đặt vào bất kỳ phần thưởng nào) cho 1-3 mảnh của một cầu thủ.
 - Âm thanh game và nhạc menu EA Trax. `tools/eatrax_song.py` đặt bài hát của bạn lên đầu, nhưng sau đó
   game bị crash sau mỗi trận (xem lỗi đã biết bên dưới).
 - Trang quản trị web tại http://127.0.0.1:8088/ (EP, cầu thủ, gói, quà, quà hằng ngày, thưởng sau trận, cài đặt trận, kinh tế, chat AI, Cửa hàng, nhật ký)
