@@ -38,7 +38,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(HERE, "admin", "index.html")
 POS_NAMES = "GK SW RWB RB RCB CB LCB LB LWB RDM CDM LDM RM RCM CM LCM LM RAM CAM LAM RF CF LF RW RS ST LS LW".split()
 API = {}
-READ_ONLY = {"summary", "players", "search", "packs", "daily", "playtime", "ladder_rewards", "match_rewards", "vm_chat", "missions", "prematch", "economy", "log", "shop",
+READ_ONLY = {"summary", "players", "search", "packs", "daily", "playtime", "ladder_rewards", "match_rewards", "vm_chat", "missions", "prematch", "economy", "log", "shop", "craft",
              "notice", "assets", "card_meta", "card", "card_edits", "crest", "seasons", "mod_export", "teamcolors", "koth", "koth_rewards", "world", "vm_gen", "face", "heads", "photo_head", "staff"}  # the rest must be POST + header
 hc = None  # the http_config module, set by start() (or by tests)
 
@@ -462,6 +462,51 @@ def match_rewards_set(p):
         json.dump(cfg, f, indent=1)
     hc.shop_changed()  # a paid Shop prices the League Simulation coupon by these rewards
     return cfg
+
+
+@api("craft")
+def craft(p):
+    """Kontrak pemain (issue #44: "Can we change the player list in craft system?"): its settings and the
+    players it lists now (the fee in % of a card's price)."""
+    cfg, recipes = hc.craft_cfg(), hc.craft_recipes()
+    cards = hc.craft_cards()
+    nm = names(s for s, _, _ in cards)
+    rows = [{"spid": s, "name": nm.get(s, n), "season": s // 1000000, "ovr": hc.card_ovr(s),
+             "price": recipes[str(pid)]["result"]["normal"]["price"], "fee": recipes[str(pid)]["money"]["ep"]}
+            for s, pid, n in cards]
+    return {"count": cfg["count"], "pieces": cfg["pieces"], "grade": cfg["grade"], "fee": round(cfg["fee"] * 100, 2),
+            "custom": bool(cfg["players"]), "players": rows, "file": rel(hc.CRAFT_FILE)}
+
+
+@api("craft_set")
+def craft_set(p):
+    """gamedata/craft.json: players [spid] (one a player; [] = the default list of the `count` best Legend
+    players), pieces, fee (%), grade; reset = all defaults."""
+    if p.get("reset"):
+        if os.path.isfile(hc.CRAFT_FILE):
+            os.remove(hc.CRAFT_FILE)
+        return craft(p)
+    players = list(dict.fromkeys(as_int(s, 1_000_000, 10 ** 10, "spid") for s in p.get("players") or []))
+    if len(players) > 200:
+        raise AdminError("e_range", ("cr_players",), 0, 200)
+    with closing(hc._db()) as c:
+        q = "SELECT 1 FROM players p JOIN namesind n ON n.playerid = p.playerid WHERE p.spid = ?"
+        bad = next((s for s in players if not c.execute(q, (s,)).fetchone()), None)
+    if bad is not None:
+        raise AdminError("e_craft_card", bad)
+    try:
+        fee = float(p.get("fee"))
+    except (TypeError, ValueError):
+        raise AdminError("e_number", ("cr_fee",))
+    if not 0 <= fee <= 100:
+        raise AdminError("e_range", ("cr_fee",), 0, 100)
+    cfg = {"players": players, "count": as_int(p.get("count"), 1, 200, ("cr_count",)),
+           "pieces": as_int(p.get("pieces"), 1, 99, ("cr_pieces",)), "fee": round(fee / 100, 4),
+           "grade": as_int(p.get("grade"), 1, 10, ("grade",))}
+    os.makedirs(os.path.dirname(hc.CRAFT_FILE), exist_ok=True)
+    with open(hc.CRAFT_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=1)
+    return craft(p)
 
 
 @api("vm_chat")
@@ -2159,6 +2204,7 @@ I18N = {
         never="belum pernah", f_today_wib="Hari ini (WIB)", daily_saved="Tabel hadiah harian disimpan.", sent_bag="\"{0}\" dikirim ke Bag.",
         confirm_reset_streak="Reset streak login ke 0?", streak_reset="Streak direset.",
         nav_match="Hadiah match", mr_title="Hadiah match", mr_lead="Diberikan setelah setiap match yang dimainkan dan setiap Simulasi Liga: EP dan EXP menurut hasil, lalu tiga kartu hadiah. Kartu yang dibuka pemain diambil acak dari daftar kartu menurut bobotnya. Tersimpan di {0}; berlaku mulai match berikutnya.", mr_result="Menurut hasil", th_result="Hasil", mr_win="Menang", mr_draw="Seri", mr_loss="Kalah", mr_coach_exp="EXP manajer", mr_player_exp="EXP tiap pemain", mr_cards="Kartu hadiah", mr_chance="peluang {0}%", mr_saved="Hadiah match disimpan.",
+        cr_title="Kontrak pemain", cr_lead="Pemain yang bisa dikontrak di Tim > Manajemen pemain > Kontrak pemain; Kotak player piece memberi piece salah satu dari mereka. Tanpa daftar sendiri: pemain Legend terbaik. Pemain yang dihapus dari daftar tetap menyimpan piece-nya. Tersimpan di {0}; daftar di game berganti sejak login berikutnya.", cr_default="Daftar bawaan: {0} pemain Legend terbaik.", cr_custom="Daftar sendiri: {0} pemain.", cr_pieces="Player piece per kontrak", cr_fee="Biaya (% harga kartu)", cr_count="Jumlah pemain daftar bawaan", cr_players="Pemain", cr_th_fee="Biaya EP", cr_add="Tambah pemain", cr_pick="Tambahkan", cr_reset="Kembali ke bawaan", cr_saved="Kontrak pemain disimpan.", cr_none="Daftar kosong: simpan untuk memakai daftar bawaan.", e_craft_card="kartu {0} tidak ada di database",
         scout_title="Scout (Tukar Scout)", scout_lead="Scout yang baru dipakai terkunci sampai cooldown habis.", th_available="Tersedia lagi",
         locked="terkunci", ready="siap dipakai", now="sekarang", no_quest="tanpa quest", scout_reset="Reset cooldown semua scout",
         scouts_ready="Semua scout siap dipakai lagi.", q_value="nilai pemain ≥", q_grade="grade ≥", q_count="jumlah", q_season="musim",
@@ -2254,6 +2300,7 @@ I18N = {
         never="never", f_today_wib="Today (WIB)", daily_saved="Daily reward table saved.", sent_bag="\"{0}\" sent to the Bag.",
         confirm_reset_streak="Reset the login streak to 0?", streak_reset="Streak reset.",
         nav_match="Match rewards", mr_title="Match rewards", mr_lead="Given after every played match and every Liga simulation: EP and exp by result, then three reward cards. The card the player opens is drawn from the card list by weight. Saved in {0}; used from the next match.", mr_result="By result", th_result="Result", mr_win="Win", mr_draw="Draw", mr_loss="Loss", mr_coach_exp="Manager exp", mr_player_exp="Exp per player", mr_cards="Reward cards", mr_chance="chance {0}%", mr_saved="Match rewards saved.",
+        cr_title="Kontrak pemain (player contracts)", cr_lead="The players Tim > Manajemen pemain > Kontrak pemain can sign; a Kotak player piece gives pieces of one of them. Without a list of your own: the best Legend players. A player taken off the list keeps his pieces. Saved in {0}; the game's list changes from the next login.", cr_default="Default list: the {0} best Legend players.", cr_custom="Your own list: {0} players.", cr_pieces="Player pieces per contract", cr_fee="Fee (% of the card's price)", cr_count="Players in the default list", cr_players="Players", cr_th_fee="EP fee", cr_add="Add a player", cr_pick="Add", cr_reset="Back to the default", cr_saved="Kontrak pemain saved.", cr_none="Empty list: saving uses the default list.", e_craft_card="card {0} is not in the database",
         scout_title="Scouts (Tukar Scout)", scout_lead="A scout just used stays locked until its cooldown ends.", th_available="Available again",
         locked="locked", ready="ready", now="now", no_quest="no quest", scout_reset="Reset every scout's cooldown",
         scouts_ready="Every scout is ready again.", q_value="player value ≥", q_grade="grade ≥", q_count="count", q_season="season",
@@ -2351,6 +2398,7 @@ I18N = {
         never="从未", f_today_wib="今天（WIB）", daily_saved="每日奖励表已保存。", sent_bag="“{0}”已发送到 Bag。",
         confirm_reset_streak="把连续登录重置为 0？", streak_reset="连续登录已重置。",
         nav_match="比赛奖励", mr_title="比赛奖励", mr_lead="每场比赛结束后和每次联赛模拟后发放：按结果给 EP 和经验，然后发三张奖励卡。玩家翻开的卡按权重从卡片列表中随机抽取。保存在 {0}；从下一场比赛开始生效。", mr_result="按结果", th_result="结果", mr_win="胜", mr_draw="平", mr_loss="负", mr_coach_exp="经理经验", mr_player_exp="每名球员经验", mr_cards="奖励卡", mr_chance="概率 {0}%", mr_saved="比赛奖励已保存。",
+        cr_title="Kontrak pemain（球员合同）", cr_lead="可在 Tim > Manajemen pemain > Kontrak pemain 签约的球员；Kotak player piece 会给出其中一名球员的碎片。没有自定义列表时：最佳传奇球员。从列表中移除的球员保留其碎片。保存在 {0}；游戏内列表从下次登录起更新。", cr_default="默认列表：{0} 名最佳传奇球员。", cr_custom="自定义列表：{0} 名球员。", cr_pieces="每份合同所需球员碎片", cr_fee="费用（球员卡价格的 %）", cr_count="默认列表球员数", cr_players="球员", cr_th_fee="EP 费用", cr_add="添加球员", cr_pick="添加", cr_reset="恢复默认", cr_saved="Kontrak pemain 已保存。", cr_none="列表为空：保存后使用默认列表。", e_craft_card="数据库中没有卡 {0}",
         scout_title="球探（Tukar Scout）", scout_lead="刚用过的球探会锁定，直到冷却结束。", th_available="再次可用",
         locked="已锁定", ready="可用", now="现在", no_quest="无任务", scout_reset="重置所有球探的冷却",
         scouts_ready="所有球探已可再次使用。", q_value="球员身价 ≥", q_grade="强化等级 ≥", q_count="数量", q_season="赛季",
@@ -2447,6 +2495,7 @@ I18N = {
         never="ยังไม่เคย", f_today_wib="วันนี้ (WIB)", daily_saved="บันทึกตารางรางวัลรายวันแล้ว", sent_bag="ส่ง \"{0}\" ไปที่ Bag แล้ว",
         confirm_reset_streak="รีเซ็ตการล็อกอินต่อเนื่องเป็น 0?", streak_reset="รีเซ็ตการล็อกอินต่อเนื่องแล้ว",
         nav_match="รางวัลหลังแมตช์", mr_title="รางวัลหลังแมตช์", mr_lead="มอบให้หลังทุกแมตช์ที่เล่นและทุกครั้งที่จำลองลีก: EP และ EXP ตามผลการแข่งขัน แล้วมีการ์ดรางวัลสามใบ การ์ดที่ผู้เล่นเปิดจะสุ่มจากรายการการ์ดตามน้ำหนัก บันทึกไว้ที่ {0} ใช้ตั้งแต่แมตช์ถัดไป", mr_result="ตามผลการแข่งขัน", th_result="ผล", mr_win="ชนะ", mr_draw="เสมอ", mr_loss="แพ้", mr_coach_exp="EXP ผู้จัดการ", mr_player_exp="EXP ต่อผู้เล่น", mr_cards="การ์ดรางวัล", mr_chance="โอกาส {0}%", mr_saved="บันทึกรางวัลหลังแมตช์แล้ว",
+        cr_title="Kontrak pemain (สัญญานักเตะ)", cr_lead="นักเตะที่เซ็นสัญญาได้ใน Tim > Manajemen pemain > Kontrak pemain; Kotak player piece ให้ชิ้นส่วนของหนึ่งในนั้น ถ้าไม่มีรายชื่อของตัวเอง: นักเตะ Legend ที่ดีที่สุด นักเตะที่ถูกเอาออกจากรายชื่อยังเก็บชิ้นส่วนไว้ บันทึกที่ {0}; รายชื่อในเกมเปลี่ยนตั้งแต่ล็อกอินครั้งถัดไป", cr_default="รายชื่อเริ่มต้น: นักเตะ Legend ที่ดีที่สุด {0} คน", cr_custom="รายชื่อของตัวเอง: {0} คน", cr_pieces="ชิ้นส่วนนักเตะต่อสัญญา", cr_fee="ค่าธรรมเนียม (% ของราคาการ์ด)", cr_count="จำนวนนักเตะในรายชื่อเริ่มต้น", cr_players="นักเตะ", cr_th_fee="ค่าธรรมเนียม EP", cr_add="เพิ่มนักเตะ", cr_pick="เพิ่ม", cr_reset="กลับเป็นค่าเริ่มต้น", cr_saved="บันทึก Kontrak pemain แล้ว", cr_none="รายชื่อว่าง: บันทึกแล้วจะใช้รายชื่อเริ่มต้น", e_craft_card="ไม่มีการ์ด {0} ในฐานข้อมูล",
         scout_title="แมวมอง (Tukar Scout)", scout_lead="แมวมองที่เพิ่งใช้จะถูกล็อกจนกว่าคูลดาวน์จะหมด", th_available="ใช้ได้อีกครั้ง",
         locked="ล็อกอยู่", ready="พร้อมใช้", now="ตอนนี้", no_quest="ไม่มีเควสต์", scout_reset="รีเซ็ตคูลดาวน์ของแมวมองทั้งหมด",
         scouts_ready="แมวมองทั้งหมดพร้อมใช้อีกครั้ง", q_value="มูลค่านักเตะ ≥", q_grade="เกรด ≥", q_count="จำนวน", q_season="ซีซั่น",
@@ -2543,6 +2592,7 @@ I18N = {
         never="chưa bao giờ", f_today_wib="Hôm nay (WIB)", daily_saved="Đã lưu bảng quà hằng ngày.", sent_bag="Đã gửi \"{0}\" vào Bag.",
         confirm_reset_streak="Đặt lại chuỗi đăng nhập về 0?", streak_reset="Đã đặt lại chuỗi đăng nhập.",
         nav_match="Thưởng sau trận", mr_title="Thưởng sau trận", mr_lead="Trao sau mỗi trận đã đá và mỗi lần mô phỏng Liga: EP và EXP theo kết quả, rồi ba thẻ thưởng. Thẻ người chơi lật được rút ngẫu nhiên từ danh sách thẻ theo trọng số. Lưu trong {0}; áp dụng từ trận tiếp theo.", mr_result="Theo kết quả", th_result="Kết quả", mr_win="Thắng", mr_draw="Hòa", mr_loss="Thua", mr_coach_exp="EXP huấn luyện viên", mr_player_exp="EXP mỗi cầu thủ", mr_cards="Thẻ thưởng", mr_chance="tỉ lệ {0}%", mr_saved="Đã lưu thưởng sau trận.",
+        cr_title="Kontrak pemain (hợp đồng cầu thủ)", cr_lead="Các cầu thủ có thể ký ở Tim > Manajemen pemain > Kontrak pemain; Kotak player piece cho mảnh của một trong số họ. Không có danh sách riêng: các cầu thủ Legend giỏi nhất. Cầu thủ bị bỏ khỏi danh sách vẫn giữ mảnh của mình. Lưu trong {0}; danh sách trong game đổi từ lần đăng nhập sau.", cr_default="Danh sách mặc định: {0} cầu thủ Legend giỏi nhất.", cr_custom="Danh sách riêng: {0} cầu thủ.", cr_pieces="Mảnh cầu thủ mỗi hợp đồng", cr_fee="Phí (% giá thẻ)", cr_count="Số cầu thủ trong danh sách mặc định", cr_players="Cầu thủ", cr_th_fee="Phí EP", cr_add="Thêm cầu thủ", cr_pick="Thêm", cr_reset="Về mặc định", cr_saved="Đã lưu Kontrak pemain.", cr_none="Danh sách trống: lưu sẽ dùng danh sách mặc định.", e_craft_card="không có thẻ {0} trong cơ sở dữ liệu",
         scout_title="Tuyển trạch viên (Tukar Scout)", scout_lead="Tuyển trạch viên vừa dùng sẽ bị khóa đến khi hết thời gian hồi.", th_available="Dùng lại được lúc",
         locked="đang khóa", ready="sẵn sàng", now="ngay bây giờ", no_quest="không có nhiệm vụ", scout_reset="Đặt lại thời gian hồi của mọi tuyển trạch viên",
         scouts_ready="Mọi tuyển trạch viên đã sẵn sàng.", q_value="giá trị cầu thủ ≥", q_grade="cấp ≥", q_count="số lượng", q_season="mùa",
@@ -2639,6 +2689,7 @@ I18N = {
         never="없음", f_today_wib="오늘(WIB)", daily_saved="출석 보상 표를 저장했습니다.", sent_bag="\"{0}\"을(를) Bag으로 보냈습니다.",
         confirm_reset_streak="연속 로그인을 0으로 초기화할까요?", streak_reset="연속 로그인을 초기화했습니다.",
         nav_match="경기 보상", mr_title="경기 보상", mr_lead="플레이한 모든 경기와 리그 시뮬레이션 뒤에 지급됩니다: 결과에 따른 EP와 경험치, 그리고 보상 카드 3장. 선수가 여는 카드는 카드 목록에서 가중치에 따라 무작위로 뽑힙니다. {0}에 저장되며 다음 경기부터 적용됩니다.", mr_result="결과별", th_result="결과", mr_win="승", mr_draw="무", mr_loss="패", mr_coach_exp="감독 경험치", mr_player_exp="선수당 경험치", mr_cards="보상 카드", mr_chance="확률 {0}%", mr_saved="경기 보상을 저장했습니다.",
+        cr_title="Kontrak pemain (선수 계약)", cr_lead="Tim > Manajemen pemain > Kontrak pemain에서 계약할 수 있는 선수; Kotak player piece는 그중 한 선수의 조각을 줍니다. 직접 만든 목록이 없으면: 최고의 레전드 선수. 목록에서 빠진 선수의 조각은 남습니다. {0}에 저장되며 게임의 목록은 다음 로그인부터 바뀝니다.", cr_default="기본 목록: 최고의 레전드 선수 {0}명.", cr_custom="직접 만든 목록: {0}명.", cr_pieces="계약당 선수 조각", cr_fee="비용(카드 가격의 %)", cr_count="기본 목록 선수 수", cr_players="선수", cr_th_fee="EP 비용", cr_add="선수 추가", cr_pick="추가", cr_reset="기본값으로", cr_saved="Kontrak pemain을 저장했습니다.", cr_none="목록이 비어 있음: 저장하면 기본 목록을 씁니다.", e_craft_card="데이터베이스에 카드 {0}이(가) 없습니다",
         scout_title="스카우트(Tukar Scout)", scout_lead="방금 쓴 스카우트는 쿨다운이 끝날 때까지 잠깁니다.", th_available="다시 사용 가능",
         locked="잠김", ready="사용 가능", now="지금", no_quest="퀘스트 없음", scout_reset="모든 스카우트 쿨다운 초기화",
         scouts_ready="모든 스카우트를 다시 쓸 수 있습니다.", q_value="선수 가치 ≥", q_grade="강화 등급 ≥", q_count="수량", q_season="시즌",

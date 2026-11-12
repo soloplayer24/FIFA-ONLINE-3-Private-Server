@@ -34,6 +34,7 @@ def main():
         hc.ECONOMY_FILE = os.path.join(tmp, "economy.json"); hc.ECONOMY = dict(hc.ECONOMY_DEFAULT)  # not the live one
         hc.MATCH_REWARD_FILE = os.path.join(tmp, "match_rewards.json")  # default match rewards; admin test writes here
         hc.MISSIONS_FILE = os.path.join(tmp, "missions.json")  # default missions; admin test writes here
+        hc.CRAFT_FILE = os.path.join(tmp, "craft.json")  # the default Kontrak pemain list; admin test writes here
         hc.VM_GEN_FILE = os.path.join(tmp, "vm_gen.json"); hc.vm_set_generation(0)  # the first crowd, not a regenerated one
         # a fresh account through the client's club creation (the live state may hold no manager)
         hc._save({"coaches": [], "defaultcoachid": "", "teams": {}})
@@ -3355,7 +3356,7 @@ def main():
         # issue #44: Kontrak pemain (craft) lists the best Legend players; a "Kotak player piece" gives 1-3
         # pieces of one of them; 10 pieces + a contract + the fee sign his card
         recipes = body(hc.ENDPOINTS["/mixin/recipes"]("", b""))
-        assert len(recipes) == hc.CRAFT_RECIPES and all(r["category"] == "player" for r in recipes.values())
+        assert len(recipes) == hc.CRAFT_DEFAULT["count"] and all(r["category"] == "player" for r in recipes.values())
         rid, r = next(iter(recipes.items()))
         spid, piece = r["result"]["normal"]["id"], r["materials"][0]["itemid"]
         assert spid // 1000000 in hc.TC_LEGENDS and hc.on_market(spid) and piece == hc.CRAFT_PIECE + int(rid)
@@ -3369,23 +3370,44 @@ def main():
         mine = {i["itemid"]: i for i in hc.coach_me(hc._state(), hc._default_slot(st))["items"]}
         assert mine[got["item"]["itemid"]]["remains"] == got["item"]["count"] and hc.CRAFT_BOX not in mine
         cache = body(hc.ENDPOINTS["/static/cache/item"]("", json.dumps({"itemids": [piece]}).encode()))
-        assert cache[str(piece)]["spid"] == spid and cache[str(piece)]["enhance"] == hc.CRAFT_GRADE
+        assert cache[str(piece)]["spid"] == spid and cache[str(piece)]["enhance"] == hc.CRAFT_DEFAULT["grade"]
         mix = lambda rid: body(hc.route(f"/mixin/{rid}")("", json.dumps({"materials": []}).encode()))
         assert mix(rid)["reason"] == "CRAFTSYSTEM_ERROR_02" and mix("1")["reason"] == "CRAFTSYSTEM_ERROR_03"
         st = hc._state(); coach = hc.my_coach(st)
-        hc.inventory_add(coach, piece, hc.CRAFT_PIECES + 2); contract = hc.inventory_add(coach, hc.CRAFT_CONTRACT, 1)
+        hc.inventory_add(coach, piece, hc.CRAFT_DEFAULT["pieces"] + 2); contract = hc.inventory_add(coach, hc.CRAFT_CONTRACT, 1)
         coach["ep"] = r["money"]["ep"] - 1; hc._save(st)
         assert mix(rid)["reason"] == "CRAFTSYSTEM_ERROR_05"
         assert body(hc.route(f"/item/{contract['_id']}/use")("", b"{}"))["reason"] == "ITEM_USE_ERROR"  # only Kontrak pemain spends it
         st = hc._state(); hc.my_coach(st)["ep"] = r["money"]["ep"] + 5; hc._save(st)
         players = len(hc._state()["teams"][str(hc._default_slot(st))]["players"])
         done = mix(rid)
-        assert done["result"] and done["results"] == [{"spid": spid, "grade": hc.CRAFT_GRADE}], done
+        assert done["result"] and done["results"] == [{"spid": spid, "grade": hc.CRAFT_DEFAULT["grade"]}], done
         st = hc._state(); coach = hc.my_coach(st); t = st["teams"][str(hc._default_slot(st))]
         left = {i["itemid"]: i["remains"] for i in coach["items"]}
         assert coach["ep"] == 5 and hc.CRAFT_CONTRACT not in left and left[piece] >= 2
-        assert len(t["players"]) == players + 1 and t["players"][-1]["spid"] == spid and t["players"][-1]["grade"] == hc.CRAFT_GRADE
+        assert len(t["players"]) == players + 1 and t["players"][-1]["spid"] == spid and t["players"][-1]["grade"] == hc.CRAFT_DEFAULT["grade"]
         assert any(p["spid"] == spid for p in done["resources"][0]["body"]["team"]["players"])
+        # issue #44 ("Can we change the player list in craft system?"): the admin page's Shop tab sets the
+        # list (one card a player, in its order), the pieces, the fee and the grade; reset = the default
+        cr = A("craft")
+        assert not cr["custom"] and len(cr["players"]) == hc.CRAFT_DEFAULT["count"] and cr["fee"] == 5 and cr["pieces"] == 10
+        messi = next(r["spid"] for r in A("search", q="Messi")["rows"] if r["market"])
+        assert refused("craft_set", players=[158023], pieces=4, fee=2, grade=3, count=30)  # season 0: an engine card
+        with hc.closing(hc._db()) as c:  # spid twice, then another card of his: one recipe a player
+            other = c.execute("SELECT spid FROM players WHERE playerid = ? AND spid != ? AND spid >= 1000000",
+                              (spid % 1000000, spid)).fetchone()
+        own = [messi, spid, spid] + ([other[0]] if other else [])
+        cr = A("craft_set", players=own, pieces=4, fee=2.5, grade=3, count=30)
+        assert cr["custom"] and [r["spid"] for r in cr["players"]] == [messi, spid] and cr["fee"] == 2.5
+        rec = body(hc.ENDPOINTS["/mixin/recipes"]("", b""))
+        assert list(rec) == [str(messi % 1000000), str(spid % 1000000)]
+        assert rec[str(messi % 1000000)]["materials"][0]["count"] == 4 and rec[str(messi % 1000000)]["result"]["normal"]["grade"] == 3
+        assert rec[str(messi % 1000000)]["money"]["ep"] == hc.sig3(hc.card_price(messi, 3) * 0.025)
+        assert hc.piece_def(hc.CRAFT_PIECE + messi % 1000000)["enhance"] == 3
+        assert refused("craft_set", players=[1234567], pieces=4, fee=2, grade=3, count=30)  # no such card
+        assert refused("craft_set", players=[], pieces=0, fee=2, grade=3, count=30) and refused("craft_set", players=[], pieces=4, fee=101, grade=3, count=30)
+        assert len(A("craft_set", players=[], pieces=10, fee=5, grade=1, count=12)["players"]) == 12  # the default list, 12 long
+        assert A("craft_set", reset=True)["players"] == A("craft")["players"] and not os.path.isfile(hc.CRAFT_FILE)
         # --- delete a manager: PUT /coach/<slot>/postponed -> "postpone" until hideat (restorable with
         # DELETE /coach/<_id>/postponed), then the slot is free and the club data goes with it
         slot = hc._default_slot(hc._state()); cid = hc.coach_id(slot)

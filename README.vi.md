@@ -48,6 +48,7 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
   kiểm tra phong độ ảnh hưởng gì trong trận). *Kontrak pemain* (craft của FO3) đã chạy: 30 cầu thủ Legend
   tốt nhất, mỗi người cần 10 mảnh cầu thủ, vật phẩm "Kontrak pemain" (Shop) và 5% giá thẻ bằng EP; "Kotak player
   piece" (Shop, thẻ thưởng sau trận mặc định; trang admin có thể đặt vào bất kỳ phần thưởng nào) cho 1-3 mảnh của một cầu thủ.
+  Tab Shop của trang admin đổi được danh sách (thẻ bất kỳ), số mảnh, phí và cấp.
 - Âm thanh game và nhạc menu EA Trax. `tools/eatrax_song.py` đặt bài hát của bạn lên đầu, nhưng sau đó
   game bị crash sau mỗi trận (xem lỗi đã biết bên dưới).
 - Trang quản trị web tại http://127.0.0.1:8088/ (EP, cầu thủ, gói, quà, quà hằng ngày, thưởng sau trận, cài đặt trận, kinh tế, chat AI, Cửa hàng, nhật ký)

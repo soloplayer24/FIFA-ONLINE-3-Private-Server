@@ -4639,14 +4639,17 @@ def ep_player_release(pid, query, body):
 # shows the signed card (TeamManagementPlayerCraftPopupScreen). The super material (features
 # ...craft.material, materials[0].replace) is off. A piece is an item of type ITEM_PLAYER_CRAFT with
 # staticdata spid / enhance: Item saya leaves those out (CoachProxy.getShowItemInInventory).
-# Recipes: the CRAFT_RECIPES best Legend players (TC_LEGENDS seasons, one card each, on the Market) at
-# +CRAFT_GRADE, for CRAFT_PIECES of his pieces, one contract and CRAFT_FEE of the card's price. Pieces
-# come from the "Kotak player piece" item (CRAFT_BOX: 1-3 pieces of a random recipe; Shop, match
-# reward cards, daily rewards, the Bag...), the contract from the Shop.
+# Recipes (gamedata/craft.json, the admin page's Shop tab; issue #44: "Can we change the player list in
+# craft system?"): its players [spid] (one card a player, the first), or none = the `count` best Legend
+# players (TC_LEGENDS seasons, one card each, on the Market); each at +`grade` for `pieces` of his pieces,
+# one contract and `fee` of the card's price. Pieces come from the "Kotak player piece" item (CRAFT_BOX:
+# 1-3 pieces of a random recipe; Shop, match reward cards, daily rewards, the Bag...), the contract from
+# the Shop. A player taken off the list keeps his pieces (they count again if he comes back).
 # --------------------------------------------------------------------------- #
 CRAFT_CONTRACT, CRAFT_BOX = 970_000_000, 970_000_001  # icons: a signed sheet, a crate of balls
 CRAFT_PIECE = 971_000_000  # + player id: that player's pieces
-CRAFT_RECIPES, CRAFT_PIECES, CRAFT_FEE, CRAFT_GRADE = 30, 10, 0.05, 1
+CRAFT_FILE = os.path.join(HERE, "gamedata", "craft.json")
+CRAFT_DEFAULT = {"players": [], "count": 30, "pieces": 10, "fee": 0.05, "grade": 1}
 CRAFT_BOX_EP = 5_000_000  # a paid Shop's box price at player prices x1
 
 
@@ -4654,29 +4657,49 @@ def is_piece(itemid):
     return CRAFT_PIECE < int(itemid) < CRAFT_PIECE + 1_000_000
 
 
-@functools.lru_cache(maxsize=None)
+def craft_cfg():
+    """CRAFT_DEFAULT with gamedata/craft.json's settings (read at every use: a change counts from the
+    next request, the client's list from the next login)."""
+    try:
+        with open(CRAFT_FILE, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        cfg = {}
+    return {**CRAFT_DEFAULT, **{k: v for k, v in (cfg if isinstance(cfg, dict) else {}).items() if k in CRAFT_DEFAULT}}
+
+
 def craft_cards():
-    """[(spid, player id, short name)] of the recipes, best first."""
+    """[(spid, player id, short name)] of the recipes, in the list's order (the default list: best first)."""
+    cfg = craft_cfg()
+    return _craft_cards(tuple(int(s) for s in cfg["players"]), int(cfg["count"]))
+
+
+@functools.lru_cache(maxsize=8)
+def _craft_cards(players, count):
     with closing(_db()) as c:
-        rows = c.execute(f"""SELECT p.spid, p.playerid, n.short FROM players p JOIN namesind n ON n.playerid = p.playerid
-                             WHERE p.spid / 1000000 IN ({_in(TC_LEGENDS)}) ORDER BY {POSOVR} DESC, p.spid""").fetchall()
+        if players:
+            q = "SELECT p.spid, p.playerid, n.short FROM players p JOIN namesind n ON n.playerid = p.playerid WHERE p.spid = ?"
+            rows = [r for r in (c.execute(q, (s,)).fetchone() for s in players) if r]
+        else:
+            rows = c.execute(f"""SELECT p.spid, p.playerid, n.short FROM players p JOIN namesind n ON n.playerid = p.playerid
+                                 WHERE p.spid / 1000000 IN ({_in(TC_LEGENDS)}) ORDER BY {POSOVR} DESC, p.spid""").fetchall()
     market, seen, out = market_spids(), set(), []
     for spid, pid, name in rows:
-        if spid in market and pid not in seen:
+        if (players or spid in market) and pid not in seen:
             seen.add(pid)
             out.append((spid, pid, name))
-    return out[:CRAFT_RECIPES]
+    return out if players else out[:count]
 
 
 def craft_recipes():
     """GET /mixin/recipes: {recipeid (the player id): recipe}."""
-    out = {}
+    cfg, out = craft_cfg(), {}
     for spid, pid, _ in craft_cards():
-        price = card_price(spid, CRAFT_GRADE)
+        price = card_price(spid, cfg["grade"])
         out[str(pid)] = {"recipeid": pid, "category": "player",
-                         "materials": [{"itemid": CRAFT_PIECE + pid, "count": CRAFT_PIECES}, {"itemid": CRAFT_CONTRACT, "count": 1}],
-                         "result": {"normal": {"id": spid, "grade": CRAFT_GRADE, "price": price}},
-                         "money": {"ep": sig3(price * CRAFT_FEE)}}
+                         "materials": [{"itemid": CRAFT_PIECE + pid, "count": cfg["pieces"]}, {"itemid": CRAFT_CONTRACT, "count": 1}],
+                         "result": {"normal": {"id": spid, "grade": cfg["grade"], "price": price}},
+                         "money": {"ep": sig3(price * cfg["fee"])}}
     return out
 
 
@@ -4691,10 +4714,11 @@ def piece_def(itemid):
                           (pid,)).fetchone()
         spid = r[0] if r else pid
         name = card_name(spid)
+    cfg = craft_cfg()
     return {"itemid": int(itemid), "productid": int(itemid), "name": f"Player piece {name}", "category": "USE",
             "type": "ITEM_PLAYER_CRAFT", "unit": "COUNT", "itemicon": ITEMS[CRAFT_BOX][1], "stackable": True,
-            "spid": spid, "enhance": CRAFT_GRADE,
-            "description": f"Kumpulkan {CRAFT_PIECES} untuk mengontrak {name} (Tim > Manajemen pemain > Kontrak pemain)."}
+            "spid": spid, "enhance": cfg["grade"],
+            "description": f"Kumpulkan {cfg['pieces']} untuk mengontrak {name} (Tim > Manajemen pemain > Kontrak pemain)."}
 
 
 def ep_mixin(rid, query, body):

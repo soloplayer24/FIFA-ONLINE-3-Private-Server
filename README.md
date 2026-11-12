@@ -43,7 +43,8 @@ Tested in the real client (Indonesian UI):
   worst, new every day at 00:00 WIB; what the game does with form in a match is not checked).
   *Kontrak pemain* (FO3's craft) works: the 30 best Legend players, each for 10 of his player
   pieces, a "Kontrak pemain" item (Shop) and 5% of his price in EP; a "Kotak player piece" (Shop,
-  and a default match reward card; the admin page can put it in any reward) gives 1-3 pieces of one.
+  and a default match reward card; the admin page can put it in any reward) gives 1-3 pieces of one. The admin page's
+  Shop tab changes the list (any cards), the pieces, the fee and the grade.
 - Game sound and the EA Trax menu music. `tools/eatrax_song.py` puts your own song first in it,
   but the game then crashes after matches (see the known issue below).
 - Admin web page on http://127.0.0.1:8088/ (EP, players, packs, gifts, daily rewards, match rewards, match settings, economy, AI chat, Shop, log)

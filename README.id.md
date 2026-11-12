@@ -46,6 +46,7 @@ Diuji di client asli (UI bahasa Indonesia):
   di pertandingan belum dicek). *Kontrak pemain* (craft FO3) jalan: 30 pemain Legend terbaik, masing-masing
   untuk 10 player piece-nya, item "Kontrak pemain" (Shop) dan 5% harganya dalam EP; "Kotak player piece"
   (Shop, dan kartu hadiah pertandingan bawaan; admin bisa memasangnya di hadiah mana pun) berisi 1-3 piece satu pemain.
+  Tab Shop di admin mengubah daftarnya (kartu apa saja), jumlah piece, biaya dan grade.
 - Suara game dan musik menu EA Trax. `tools/eatrax_song.py` menaruh lagumu sendiri di urutan
   pertama, tapi game lalu crash setelah pertandingan (lihat masalah yang diketahui di bawah).
 - Halaman admin web di http://127.0.0.1:8088/ (EP, pemain, pak, hadiah, hadiah harian, hadiah match, pengaturan match, ekonomi, chat AI, Shop, log)
