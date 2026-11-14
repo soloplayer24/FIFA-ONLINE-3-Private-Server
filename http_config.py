@@ -790,11 +790,31 @@ LANG_ADD = {"STAFFPACK_NAME_11": "Technical Director Pack<BR>(3.0~5.0 star)",
             # Kontrak pemain's preview (issue #44; the Indonesian pack has none): {0} pieces short, {1} the contract
             "CRAFTSYSTEM_NOTICE01": "Butuh {0} player piece lagi dan {1}.",
             "CRAFTSYSTEM_NOTICE02": "Butuh {0} player piece lagi.",
-            "CRAFTSYSTEM_NOTICE03": "Butuh {0}."}
+            "CRAFTSYSTEM_NOTICE03": "Butuh {0}.",
+            # Skuad Pinjaman (LoanSquadScreen): the Indonesian pack has only some of its labels
+            "RENTAL_SQUAD_FREEROM_TITLE": "Skuad Pinjaman",
+            "RENTAL_SQUAD_FREEROM_SUB_TITLE": "Sewa 11 pemain bintang bulan ini dan pakai mereka bertanding.",
+            "RENTAL_SQUAD_MAIN_TITLE": "Skuad Pinjaman",
+            "RENTAL_SQUAD_MAIN_SUB_TITLE_05": "Poin transfer",  # beside my scout points
+            "RENTAL_SQUAD_MAIN_SUB_TITLE_06": "Batas nilai",  # under "Nilai skuad"
+            "RENTAL_SQUAD_MAIN_SUB_TITLE_07": "Pilih pemain pengganti",  # the candidates' list
+            "RENTAL_SQUAD_MAIN_CONFIRM_BUTTON": "Konfirmasi sewa",
+            "RENTAL_SQUAD_MAIN_LIST_TITLE_05": "Status",
+            "RENTAL_SQUAD_MAIN_LIST_TEXT_01": "Transfer: {0} poin",  # a rented card's row; {0} = RENTAL_COST
+            "RENTAL_SQUAD_POPUP_TITLE": "Transfer pemain",  # LoanTransferPopup
+            "RENTAL_SQUAD_POPUP_TEXT_02": "{0} sekarang menjadi milik klubmu.",
+            "RENTAL_SQUAD_POPUP_TEXT_03": "Transfer berhasil",
+            "RENTAL_SQUAD_POPUP_TEXT_04": "Nilai pemain"}
 LANG_FIXES = {b'"COMMON_TIME_DAY": "Waktu"': b'"COMMON_TIME_DAY": "Siang"',
               b'"COMMON_WEATHER_DUSK": "Malam"': b'"COMMON_WEATHER_DUSK": "Mendung"',
               # Live Boost's one group (LIVEBOOST_GROUP) is the Team of the Week
-              b'"LIVEBOOST_CUSTOM_2900": "Europe Weekly Best"': b'"LIVEBOOST_CUSTOM_2900": "Team of the Week"'}
+              b'"LIVEBOOST_CUSTOM_2900": "Europe Weekly Best"': b'"LIVEBOOST_CUSTOM_2900": "Team of the Week"',
+              # Skuad Pinjaman's tooltip, as the server runs it (rental_expire, RENTAL_POINTS)
+              b'"RENTAL_SQUAD_MAIN_SUB_TITLE_11": "Transfer semua pemain sebelum masa sewa berakhir.<Br>'
+              b'Jika masa sewa selesai, pemain sewaan akan di-reset ke grade 0."':
+              b'"RENTAL_SQUAD_MAIN_SUB_TITLE_11": "Pemain sewaan pulang saat masa sewa berakhir.<Br>'
+              b'Poin transfer didapat dari pertandingan (menang 3, seri 1). Pemain yang ditransfer '
+              b'menjadi milikmu, tetapi tidak bisa dijual atau ditukar."'}
 LANG_FIXED = os.path.join(HERE, "gamedata", f"language_{LANGUAGE}.big")
 LANG_LOCK = threading.Lock()
 
@@ -2295,6 +2315,7 @@ def ep_default_coach(slot, query, body):
     # resources are also fed to cached resources, so /coach/me (CoachProxy) goes first.
     st = _state(); switch_default_coach(st, coach_id(slot))
     daily_login(st)  # first login of the day: today's reward goes to the Bag
+    rental_expire(st)  # Skuad Pinjaman: last month's rented cards leave
     if str(slot) in st["teams"]:
         balance_first_team(st["teams"][str(slot)])
         fix_formation(st["teams"][str(slot)], next(c["teamid"] for c in st["coaches"] if c["slot"] == slot))
@@ -3138,6 +3159,8 @@ def match_reward(st, stats, own=True, live=True):
     reward = lambda n, kind: {"total": n + round(n * boost.get(kind, 0)), "detail": {"base": n, "extra": round(n * boost.get(kind, 0))}}
     coach = reward(cexp, "MATCH_PLUS_COACHEXP")
     prev, cur = coach_gain_exp(st, coach["total"])
+    if own and live:
+        rental_match(st, match_outcome(stats))  # Skuad Pinjaman's scout points
     players = []
     for p, s in match_cards(st, stats) if own else ():
         n = reward(pexp + 20 * int(s.get("goals") or 0) + 10 * int(s.get("assists") or 0), "MATCH_PLUS_PLAYEREXP_ALL")
@@ -3923,7 +3946,7 @@ def ep_transfer_offer(query, body):
     pid = str(req.get("playerobjectid"))
     p = next((p for p in team["players"] if iid(p) == pid), None)
     price = int(req.get("price") or 0)
-    if p is None or is_starter(team, p):
+    if p is None or is_starter(team, p) or card_bound(p) or not rental_keeps(team):  # Skuad Pinjaman
         return _json({"result": False, "reason": "TRANSFERMARKET_SELECT_SELLABLE_PLAYER"})
     if not 0 < price <= sell_band(p["spid"], grade_of(p))[1]:
         return _json({"result": False, "reason": "TRANSFERMARKET_LOWERLIMIT"})
@@ -4023,6 +4046,8 @@ def enhance_pair(team, a, b):
     pa = next((p for p in team["players"] if iid(p) == str(a)), None)
     pb = next((p for p in team["players"] if iid(p) == str(b)), None)
     if pa is None or pb is None or pa is pb or pa["spid"] != pb["spid"]:
+        return None, None
+    if pa.get("contracttype") == "rental" or card_bound(pb) or not rental_keeps(team):  # Skuad Pinjaman
         return None, None
     if grade_of(pa) >= 10 and grade_of(pb) > 0:  # a +10 may take only a +0 (onListItemClick)
         return None, None
@@ -4326,6 +4351,8 @@ def trade_proposal(body, make_props):
     give = [p for p in team["players"] if iid(p) in ids]
     if not 2 <= len(give) <= 10 or len(give) != len(set(ids)) or any(in_squad(team, p) for p in give):
         return _json({"result": False, "reason": "invalid playerid"})  # the tab lists reserves only
+    if any(card_bound(p) for p in give) or not rental_keeps(team, len(give)):  # Skuad Pinjaman
+        return _json({"result": False, "reason": "invalid playerid"})
     props = make_props(give, random.Random())
     st["trade"] = {"players": ids, "props": props}
     _save(st)
@@ -4493,7 +4520,8 @@ def ep_trade3_proposal(query, body):
     sent = {str(p.get("id")): p for p in req.get("playerids") or []}
     give = [p for p in team["players"] if iid(p) in sent]
     if (scout is None or not 2 <= len(give) <= 10 or len(give) != len(sent)
-            or any(in_squad(team, p) or not p.get("team2") for p in give)):  # Tim Cadangan only
+            or any(in_squad(team, p) or not p.get("team2") for p in give)  # Tim Cadangan only
+            or any(card_bound(p) for p in give) or not rental_keeps(team, len(give))):  # Skuad Pinjaman
         return _json({"result": False, "reason": "invalid playerid"})
     if any(int(sent[iid(p)].get("price") or 0) != card_price(p["spid"], grade_of(p)) for p in give):
         return _json({"result": False, "reason": "TRADE3_NOTICE_PLAYERPRICE03"})  # client shows a recheck notice
@@ -4622,7 +4650,8 @@ def ep_player_release(pid, query, body):
     p = next((x for x in team["players"] if iid(x) == pid), None)
     if p is None:
         return _json({"result": False, "reason": "not exists player"})  # the client shows NO_SUCH_OFFER
-    if is_starter(team, p) or len(team["players"]) <= 18:
+    if (is_starter(team, p) or len(team["players"]) <= 18
+            or p.get("contracttype") == "rental" or not rental_keeps(team)):  # Skuad Pinjaman
         return _json({"result": False, "reason": "COMMON_PLAYER_INFO_REMOVE_NOTALLOWED"})
     remove_player(team, p)
     _save(st)
@@ -10260,6 +10289,292 @@ ENDPOINTS.update({
     "/items/itemtodepot": ep_item_to_depot, "/item/depot": ep_item_depot,
     "/players/trade/proposal/resend": lambda q, b: _json({"result": False, "reason": "NOT_SUPPORTED_REQUEST"}),
 })
+
+
+# --------------------------------------------------------------------------- #
+# Skuad Pinjaman (user: "Pinjam Pemain"): the loan squad event of Tim's menu (LoanSquadScreen;
+# LoanSquadController / LoanSquadProxy in data/ui/libs/Module.big, its rows OnLoan*ItemRenderer in
+# components/ScrollingList.big). FO3 ID shipped the screen without the event: MenuScreen shows the
+# button only while GET /rentalplayer/squad has `target`, and both of its requests got {}.
+#   GET /static/db/RENTALPLAYER {formations {<id>: {formationname, position<i>, offset<i>x|y}},
+#     config {scout {point: what a transfer costs}, search {grade: the candidates' top grade}}}
+#   GET /rentalplayer/squad {target, startdate, enddate (yyyymmdd: periodStr cuts them with
+#     substr), scoutpoint, squadvalue (the limit), completed, formationid, players [the 11 of a
+#     confirmed squad in slot order, playerid = the card]}
+#   GET /rentalplayer/squad/proposal/<formationid> {players [11, slot order]}: the squad a
+#     formation opens with (and "Reset")
+#   GET /rentalplayer/search/<FW|MF|DF|GK>/<grade> {players}: who may take the clicked slot
+#   POST /rentalplayer/squad {formationid, players [{spid, grade}]} -> {result, formationId,
+#     resources [{uri, body: the card}]}: the screen takes every resource for one of the 11 cards,
+#     so /coach/me cannot ride along; the cards reach CoachProxy by a push (coach_cards_push)
+#   PUT /rentalplayer/<card id> -> {result, scoutpoint, price}: "Transfer", the card stays
+# Rows are the Market's ({spid, expandme, grade, price}). A rented card has contracttype "rental":
+# the client draws its grade with the loan icon and keeps it out of the sale, upgrade and trade
+# lists (TransferSaleTabPage, TeamManagementPlayerEnhancementTabPage); "normal" once transferred.
+# The original's numbers are lost; these are the server's own. A season is the WIB month. The
+# squad may be worth eleven cards rated RENTAL_BUDGET[0] at +RENTAL_BUDGET[1] (so it follows the
+# Ekonomi tab's player prices), one card at most RENTAL_SHARE of that. A confirmed squad joins Tim
+# inti until the month ends, then the cards leave (rental_expire; the game's own tooltip said
+# "reset ke grade 0": LANG_FIXES words it as it is here). A live match of mine pays scout points
+# (RENTAL_POINTS) and RENTAL_COST of them make a rented card mine for good, marked "loan": no
+# sale, trade or use as upgrade material (card_bound), or a month's squad would be EP (its cards
+# are worth far more than a club earns). While cards are rented the club keeps 18 of its own
+# (rental_keeps), so the month's end never leaves it short of players.
+# --------------------------------------------------------------------------- #
+RENTAL_GRADE_MAX = 5  # config.search.grade: candidates come at +1..+5
+RENTAL_COST = 100  # config.scout.point: scout points of one transfer
+RENTAL_POINTS = (0, 1, 3)  # scout points of a live match of mine: loss, draw, win
+RENTAL_BUDGET = (86, 3)  # the squad value limit: eleven cards of this rating at this grade
+RENTAL_SHARE = 0.35  # of the limit: the dearest candidate
+RENTAL_MIN_OVR = 70  # candidates' lowest rating
+RENTAL_ROWS = 8  # candidates per rating (of a line, in a season)
+RENTAL_LINE = {i: line for line, r in LINES.items() for i in r}  # Enums.PLAYERPOSITION -> GK|DF|MF|FW
+
+
+def rental_season(t=None):
+    """(sid, first day, last day) of the loan season, the WIB month; the days as yyyymmdd."""
+    y, mo = time.gmtime((time.time() if t is None else t) + WIB)[:2]
+    return y * 100 + mo, y * 10000 + mo * 100 + 1, y * 10000 + mo * 100 + calendar.monthrange(y, mo)[1]
+
+
+def rental_price(ovr, grade):
+    """card_price of any card with that rating."""
+    return sig3(stat_price(ovr) * GRADE_PRICE[grade] * ECONOMY["players"])
+
+
+def rental_limit():
+    return nice_ceil(11 * rental_price(*RENTAL_BUDGET))  # never under the eleven cards it stands for
+
+
+@functools.lru_cache(maxsize=None)
+def rental_pool():
+    """{line: {rating: [(spid, position)]}}: the Market's cards rated RENTAL_MIN_OVR or more, by
+    the line and the rating of their first position."""
+    with closing(_db()) as c:
+        pos = dict(c.execute("SELECT spid, preferredposition1 FROM players WHERE spid >= 1000000"))
+    spids = sorted(s for s in market_spids() if pos.get(s) in RENTAL_LINE)
+    pool = {line: {} for line in LINES}
+    for s, ovr in card_ovrs(spids).items():
+        if ovr >= RENTAL_MIN_OVR:
+            pool[RENTAL_LINE[pos[s]]].setdefault(ovr, []).append((s, pos[s]))
+    return pool
+
+
+def rental_formations():
+    """{formationid: entry} of the client's common formations (formation_table)."""
+    return {e["formationid"]: e for e in formation_table()["common"]}
+
+
+def rental_row(spid, grade):
+    return {"spid": int(spid), "expandme": "player", "grade": int(grade), "price": card_price(spid, grade)}
+
+
+def rental_candidates(line, grade, sid=None):
+    """A line's candidates at one grade: RENTAL_ROWS cards of every rating a slot can pay, drawn
+    for the season (the same cards at every grade)."""
+    sid = sid or rental_season()[0]
+    cap, out = rental_limit() * RENTAL_SHARE, []
+    for ovr, cards in sorted(rental_pool().get(line, {}).items(), reverse=True):
+        if rental_price(ovr, grade) <= cap:
+            picks = random.Random(f"{sid}/{line}/{ovr}").sample(cards, min(RENTAL_ROWS, len(cards)))
+            out += [rental_row(s, grade) for s, _ in picks]
+    return out
+
+
+def rental_proposal(fid, sid=None):
+    """Eleven cards for a formation at the budget's grade, drawn for the season: every slot gets
+    a card of its position (else of its line) at the best rating a share of 1/11 of the limit
+    pays, no player twice. [] for an unknown formation (or no player database)."""
+    form = rental_formations().get(int(fid))
+    if form is None:
+        return []
+    rng = random.Random(f"{sid or rental_season()[0]}/{fid}")
+    grade, share, pool, taken, out = RENTAL_BUDGET[1], rental_limit() / 11, rental_pool(), set(), []
+    for pos in form["positions"]:
+        cards = pool[RENTAL_LINE.get(pos, "MF")]
+        ovrs = [o for o in sorted(cards, reverse=True) if rental_price(o, grade) <= share] or sorted(cards)[:1]
+        pick = None
+        for exact, tiers in ((True, ovrs[:3]), (False, ovrs)):
+            for o in tiers:
+                free = [s for s, p in cards[o] if s % 1000000 not in taken and (p == pos or not exact)]
+                if free:
+                    pick = rng.choice(free)
+                    break
+            if pick:
+                break
+        if pick is None:
+            return []
+        taken.add(pick % 1000000)
+        out.append(rental_row(pick, grade))
+    return out
+
+
+def rental_cards(team):
+    return [p for p in team["players"] if p.get("contracttype") == "rental"]
+
+
+def card_bound(p):
+    """A rented card, or one transferred from a loan squad: it cannot be sold, traded or used up."""
+    return p.get("contracttype") == "rental" or bool(p.get("loan"))
+
+
+def rental_keeps(team, leaving=1):
+    """May `leaving` cards of my own go? While cards are rented, 18 of the club's own stay."""
+    rented = len(rental_cards(team))
+    return not rented or len(team["players"]) - rented - leaving >= 18
+
+
+def rental_expire(st, sid=None):
+    """A new season: every manager's rented cards not transferred leave his club, his squad and
+    his scout points start over. True when anything changed."""
+    sid = sid or rental_season()[0]
+    changed = False
+    for c in st["coaches"]:
+        if c.get("rental") and c["rental"].get("sid") != sid:
+            del c["rental"]
+            changed = True
+        team = st["teams"].get(str(c["slot"])) or {"players": []}
+        for p in [p for p in rental_cards(team) if p.get("rental") != sid]:
+            remove_player(team, p)
+            changed = True
+    return changed
+
+
+def rental_match(st, outcome):
+    """Scout points of a finished live match of mine (outcome -1 | 0 | 1) while a squad is rented."""
+    r = my_coach(st).get("rental")
+    if r and r.get("sid") == rental_season()[0] and r.get("players"):
+        r["points"] = r.get("points", 0) + RENTAL_POINTS[outcome + 1]
+
+
+def rental_info(st):
+    """GET /rentalplayer/squad's body for the playing manager."""
+    sid, first, last = rental_season()
+    coach = my_coach(st)
+    r = coach.get("rental") or {}
+    # target: the menu button (LoanSquadProxy.isEventValid); none without the client's formations
+    info = {"target": bool(rental_formations()), "startdate": first, "enddate": last, "scoutpoint": r.get("points", 0),
+            "squadvalue": rental_limit(), "completed": bool(r.get("players"))}
+    if info["completed"]:
+        cards = {iid(p): p for p in st["teams"][str(coach["slot"])]["players"]}
+        # a transferred card released since stays in the list as it was (the 11 are slots)
+        info.update(formationid=r["formationid"], players=[
+            {**rental_row(p["spid"], grade_of(p)), "id": e["id"], "playerid": e["id"], "contracttype": p.get("contracttype", "normal")}
+            for e in r["players"] for p in [cards.get(e["id"]) or {**e, "contracttype": "normal"}]])
+    return info
+
+
+def coach_cards_push(st, slot, ids=(), gone=()):
+    """Tell the running game which cards joined (ids) or left (gone) my club when a reply cannot
+    carry /coach/me. Whole, a big club is over a push's 64 KB, and a push without a body
+    ("[[invalidating]]") only makes the game GET it: that reply goes to the caller and never
+    reaches CoachProxy (user: the rented cards were not in Skuad). CoachProxy's CachedResource
+    takes a part instead: a push to "/coach/me?path=team.players.$" with {<_id>: card | None}
+    replaces, appends or drops by _id (CachedResource.setPartialData), and every reader of a path
+    under team.players sees it changed (NetEvent.getDataEx cuts the event's path at the "$")."""
+    cards = {p["id"]: p for p in coach_me(st, slot)["team"]["players"] if p["id"] in set(ids)}
+    return "/coach/me?path=team.players.$", {**cards, **{i: None for i in gone}}
+
+
+def ep_rental_static(query, body):
+    forms = {str(i): {"formationname": e["formationname"],
+                      **{f"position{k}": p for k, p in enumerate(e["positions"])},
+                      **{f"offset{k}{a}": o[a] for k, o in enumerate(e["offsets"]) for a in "xy"}}
+             for i, e in rental_formations().items()}
+    return _json({"formations": forms, "config": {"scout": {"point": RENTAL_COST}, "search": {"grade": RENTAL_GRADE_MAX}}})
+
+
+def ep_rental_squad(query, body):
+    """GET /rentalplayer/squad (the menu at login, the screen when it opens) and POST: confirm."""
+    try:
+        req = json.loads(body or b"{}")
+    except ValueError:
+        req = {}
+    st = _state()
+    if not st["coaches"] or str(_default_slot(st)) not in st["teams"]:
+        return _json({})  # no manager yet: no button
+    slot = _default_slot(st)
+    rented = {iid(p) for p in rental_cards(st["teams"][str(slot)])}
+    expired = rental_expire(st)
+    if isinstance(req, dict) and "formationid" in req:
+        return rental_confirm(st, req)
+    if expired:  # the month turned while the game ran: its cards leave the game's lists too
+        _save(st)
+        gone = rented - {iid(p) for p in rental_cards(st["teams"][str(slot)])}
+        if gone:
+            messenger_push(*coach_cards_push(st, slot, gone=gone))
+            messenger_push("/coach/me?path=team.squad", coach_me(st, slot)["team"]["squad"])
+    return _json(rental_info(st))
+
+
+def rental_confirm(st, req):
+    """Rent the squad the screen shows: eleven Market cards of different players at +1..
+    +RENTAL_GRADE_MAX within the limit, once a season. They join Tim inti as rented cards."""
+    sid = rental_season()[0]
+    coach = my_coach(st); team = st["teams"][str(coach["slot"])]
+    rows = req.get("players") if isinstance(req.get("players"), list) else []
+    try:
+        fid = int(req.get("formationid"))
+        picks = [(int(p["spid"]), int(p["grade"])) for p in rows]
+    except (TypeError, ValueError, KeyError):
+        return _json({"result": False, "reason": "INVALID_PARAM"})
+    if (coach.get("rental") or {}).get("players"):
+        return _json({"result": False, "reason": "RENTAL_SQUAD_POPUP_TEXT_05"})  # one squad a season
+    if (fid not in rental_formations() or len(picks) != 11 or len({s % 1000000 for s, _ in picks}) != 11
+            or any(not on_market(s) or not 1 <= g <= RENTAL_GRADE_MAX for s, g in picks)
+            or sum(card_price(s, g) for s, g in picks) > rental_limit()):
+        return _json({"result": False, "reason": "RENTAL_SQUAD_POPUP_TITLE_02"})
+    if len(team["players"]) + 11 > MAX_PLAYERS:
+        return _json({"result": False, "reason": "Exceed plyer limit"})
+    cards = []
+    for s, g in picks:
+        p = add_player(team, s, g)
+        p.pop("team2", None)  # Tim inti: Formasi lists them at once
+        p.update(contracttype="rental", rental=sid)
+        cards.append(p)
+    coach["rental"] = {"sid": sid, "points": (coach.get("rental") or {}).get("points", 0), "formationid": fid,
+                       "players": [{"id": iid(p), "spid": p["spid"], "grade": p["grade"]} for p in cards]}
+    _save(st)
+    uri, mine = coach_cards_push(st, coach["slot"], [iid(p) for p in cards])
+    threading.Timer(0.5, messenger_push, (uri, mine)).start()  # after this reply is read
+    return _json({"result": True, "formationId": fid,
+                  "resources": [{"uri": f"/rentalplayer/{iid(p)}", "body": mine[iid(p)]} for p in cards]})
+
+
+def ep_rental_proposal(fid, query, body):
+    return _json({"players": rental_proposal(fid)})
+
+
+def ep_rental_search(line, grade, query, body):
+    g = int(grade)
+    return _json({"players": rental_candidates(line.upper(), g) if 1 <= g <= RENTAL_GRADE_MAX else []})
+
+
+def ep_rental_transfer(pid, query, body):
+    """PUT /rentalplayer/<card id>: RENTAL_COST scout points make a rented card mine."""
+    try:
+        method = (json.loads(body or b"{}").get("_method") or REQUEST["method"]).upper()
+    except (ValueError, AttributeError):
+        method = REQUEST["method"]
+    if method != "PUT":  # what the path got before
+        return (ep_empty if method == "GET" else ep_telemetry)(query, body)
+    st = _state(); slot = _default_slot(st); team = st["teams"][str(slot)]
+    r = my_coach(st).get("rental") or {}
+    p = next((x for x in rental_cards(team) if iid(x) == pid), None)
+    if p is None or r.get("sid") != rental_season()[0] or p.get("rental") != r["sid"] or r.get("points", 0) < RENTAL_COST:
+        return _json({"result": False, "reason": "INVALID_PARAM"})
+    r["points"] -= RENTAL_COST
+    p.pop("rental")
+    p.update(contracttype="normal", loan=True)
+    _save(st)
+    return _json({"result": True, "scoutpoint": r["points"], "price": card_price(p["spid"], grade_of(p)),
+                  "resources": coach_me_resources(st, slot)})
+
+
+ENDPOINTS.update({"/static/db/RENTALPLAYER": ep_rental_static, "/rentalplayer/squad": ep_rental_squad})
+ROUTES += [(re.compile(r"/rentalplayer/squad/proposal/(\d+)"), ep_rental_proposal),
+           (re.compile(r"/rentalplayer/search/(\w+)/(\d+)"), ep_rental_search),
+           (re.compile(r"/rentalplayer/(\w+)"), ep_rental_transfer)]
 
 
 RESPONSES = os.path.join(HERE, "responses")

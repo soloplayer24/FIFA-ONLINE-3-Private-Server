@@ -430,6 +430,14 @@ Added, passing the tests but not yet checked in the client:
   live matches' records (goals, assists, passes, tackles, saves... plus the result; not simulations), up to
   1,200 earned; the post-match screen shows them. A "Reset poin taktik" item (Shop) gives a card's points
   back. Virtual managers' cards are grown too, more the stronger the manager.
+- **Loan squad** (Tim > Skuad Pinjaman, FO3's loan squad event; FO3 ID shipped the screen without it): every
+  month rent eleven stars for a formation. The screen opens with a squad for the formation (eleven cards
+  rated 86 at +3, which is the squad value limit; it follows the Ekonomi tab's player prices); a click on a
+  player lists replacements of his line at +1..+5, and the squad may hold any eleven within the limit.
+  "Konfirmasi sewa" puts them in Tim inti as rented cards (loan grade icon; no sale, upgrade, trade or
+  release) until the month ends, when they leave. Live matches pay transfer points while a squad is rented
+  (win 3, draw 1); 100 points make a rented card yours for good ("Transfer"; such a card cannot be sold or
+  traded). While cards are rented the club keeps 18 of its own.
 - **Random boxes open** (Kotak Platinum and the rest, issue #12): the box screen lists its prizes
   from `staticdata.availables`, which was missing, so every box failed at "Gunakan".
 - **New cards join Tim Cadangan**: a card from a pack, a trade, the Market, the Bag or the admin

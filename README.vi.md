@@ -415,6 +415,13 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
   đấu. Điểm chiến thuật đến từ thông số các trận tự chơi (bàn thắng, kiến tạo, chuyền, tắc bóng, cứu thua... cộng kết
   quả; không tính mô phỏng), tối đa 1.200; màn hình sau trận hiển thị. Vật phẩm "Reset poin taktik" (Shop) trả lại
   điểm của một thẻ. Thẻ của HLV ảo cũng phát triển, HLV càng mạnh càng nhiều.
+- **Đội hình cho mượn** (Tim > Skuad Pinjaman, sự kiện đội hình cho mượn của FO3; FO3 ID chỉ có màn hình): mỗi tháng
+  mượn mười một ngôi sao cho một sơ đồ. Màn hình mở với đội hình gợi ý cho sơ đồ đó (mười một thẻ chỉ số 86 ở +3,
+  bằng giới hạn giá trị đội hình, theo giá cầu thủ ở tab Ekonomi); bấm một cầu thủ để xem người thay thế cùng tuyến
+  ở +1..+5, đội hình có thể gồm mười một cầu thủ bất kỳ trong giới hạn. "Konfirmasi sewa" đưa họ vào Tim inti dưới
+  dạng thẻ mượn (biểu tượng cấp thẻ mượn; không bán, nâng cấp, trao đổi hay thả được) đến hết tháng, rồi họ rời đi.
+  Các trận tự chơi cho điểm chuyển nhượng khi đang mượn đội hình (thắng 3, hòa 1); 100 điểm biến một thẻ mượn thành
+  của bạn vĩnh viễn ("Transfer"; thẻ đó không bán hay trao đổi được). Khi còn thẻ mượn, CLB giữ 18 thẻ của mình.
 - **Mở được hộp ngẫu nhiên** (Kotak Platinum và các hộp khác, issue #12): màn hình hộp liệt kê phần thưởng
   từ `staticdata.availables`, trước đây bị thiếu, nên mọi hộp đều lỗi khi bấm "Gunakan" (dùng).
 - **Thẻ mới vào Tim Cadangan**: thẻ từ gói, giao dịch, Market, Bag hoặc trang quản trị hiện "-" ở cột Tim

@@ -454,6 +454,15 @@ Sudah ditambahkan dan lolos tes, tapi belum dicek di client:
   hasil; bukan simulasi), sampai total 1.200; layar hadiah setelah match menampilkannya. Item "Reset poin
   taktik" (Shop) mengembalikan poin satu kartu. Kartu manajer virtual juga berkembang, makin kuat
   manajernya makin banyak.
+- **Skuad Pinjaman** (Tim > Skuad Pinjaman, event skuad pinjaman FO3; FO3 ID hanya punya layarnya): tiap
+  bulan sewa sebelas pemain bintang untuk satu formasi. Layar dibuka dengan usulan skuad untuk formasi itu
+  (sebelas kartu rating 86 di +3, sama dengan batas nilai skuad, yang mengikuti harga pemain di tab
+  Ekonomi); klik satu pemain untuk melihat pengganti di lininya pada +1..+5, dan skuad boleh berisi sebelas
+  pemain mana pun selama di bawah batas. "Konfirmasi sewa" memasukkan mereka ke Tim inti sebagai kartu
+  sewaan (ikon grade pinjaman; tidak bisa dijual, di-upgrade, ditukar atau dilepas) sampai akhir bulan,
+  lalu mereka pulang. Pertandingan yang dimainkan langsung memberi poin transfer selama ada skuad sewaan
+  (menang 3, seri 1); 100 poin membuat satu kartu sewaan jadi milikmu ("Transfer"; kartu itu tidak bisa
+  dijual atau ditukar). Selama ada kartu sewaan, klub tetap menyimpan 18 kartu miliknya sendiri.
 - **Kotak acak bisa dibuka** (Kotak Platinum dan lainnya, issue #12): layar kotak menampilkan
   hadiahnya dari `staticdata.availables`, yang belum ada, jadi tiap kotak gagal saat "Gunakan".
 - **Kartu baru masuk Tim Cadangan**: kartu dari pak, trade, Market, Bag, atau halaman admin tampil

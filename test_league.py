@@ -2705,7 +2705,9 @@ def main():
             fixed, orig = (json.loads(hc.client_big(f, hc.LANG_ENTRY).decode("utf-8-sig")) for f in (out, src))
             assert out == hc.LANG_FIXED and (fixed["COMMON_TIME_DAY"], fixed["COMMON_WEATHER_DUSK"]) == ("Siang", "Mendung")
             assert fixed["LIVEBOOST_CUSTOM_2900"] == "Team of the Week"  # Live Boost's one group
-            keep = ("COMMON_TIME_DAY", "COMMON_WEATHER_DUSK", "LIVEBOOST_CUSTOM_2900")
+            # Skuad Pinjaman: its tooltip as the server runs the event, and the labels the pack lacks
+            assert fixed["RENTAL_SQUAD_MAIN_SUB_TITLE_11"].startswith("Pemain sewaan pulang") and fixed["RENTAL_SQUAD_FREEROM_TITLE"] == "Skuad Pinjaman"
+            keep = ("COMMON_TIME_DAY", "COMMON_WEATHER_DUSK", "LIVEBOOST_CUSTOM_2900", "RENTAL_SQUAD_MAIN_SUB_TITLE_11")
             added = {k: v for k, v in hc.LANG_ADD.items() if k not in orig}  # LANG_ADD's keys the pack lacks (Kontrak pemain's notices)
             assert {"CRAFTSYSTEM_NOTICE01", "CRAFTSYSTEM_NOTICE02"} <= set(added) and all(fixed[k] == v for k, v in added.items())
             assert {k: v for k, v in fixed.items() if k not in keep and k not in added} == {k: v for k, v in orig.items() if k not in keep}
@@ -3408,6 +3410,103 @@ def main():
         assert refused("craft_set", players=[], pieces=0, fee=2, grade=3, count=30) and refused("craft_set", players=[], pieces=4, fee=101, grade=3, count=30)
         assert len(A("craft_set", players=[], pieces=10, fee=5, grade=1, count=12)["players"]) == 12  # the default list, 12 long
         assert A("craft_set", reset=True)["players"] == A("craft")["players"] and not os.path.isfile(hc.CRAFT_FILE)
+        # --- Skuad Pinjaman (LoanSquadScreen): the month's loan squad
+        R = lambda path, req=None: body((hc.ENDPOINTS.get(path) or hc.route(path))("", json.dumps(req).encode() if req is not None else b""))
+        sent, real_timer, real_push = [], hc.threading.Timer, hc.messenger_push
+        hc.messenger_push = lambda uri, b: sent.append((uri, b))
+        hc.threading.Timer = lambda s, fn, args=(): type("T", (), {"start": lambda self: fn(*args)})()
+        try:
+            sid, first, last = hc.rental_season()
+            assert hc.rental_season(calendar.timegm((2026, 12, 31, 17, 0, 0))) == (202701, 20270101, 20270131)  # 00:00 WIB
+            limit = hc.rental_limit()
+            assert limit >= 11 * hc.rental_price(*hc.RENTAL_BUDGET)
+            static = R("/static/db/RENTALPLAYER")
+            assert static["config"] == {"scout": {"point": hc.RENTAL_COST}, "search": {"grade": hc.RENTAL_GRADE_MAX}}
+            assert len(static["formations"]) == len(hc.formation_table()["common"]) > 0
+            f0 = next(iter(static["formations"].values()))
+            assert f0["formationname"] and f0["position0"] == 0 and all(f"offset{i}{a}" in f0 and f"position{i}" in f0 for i in range(11) for a in "xy")
+            info = R("/rentalplayer/squad")
+            assert info == {"target": True, "startdate": first, "enddate": last, "scoutpoint": 0, "squadvalue": limit, "completed": False}
+            fid = int(next(iter(static["formations"])))
+            prop = R(f"/rentalplayer/squad/proposal/{fid}")["players"]
+            assert len(prop) == 11 == len({r["spid"] % 1000000 for r in prop}) and prop == R(f"/rentalplayer/squad/proposal/{fid}")["players"]
+            assert sum(r["price"] for r in prop) <= limit and all(r["expandme"] == "player" and "contracttype" not in r for r in prop)
+            shape = hc.rental_formations()[fid]["positions"]
+            pos_of = dict(c for by in hc.rental_pool().values() for cards in by.values() for c in cards)
+            assert all(hc.RENTAL_LINE[pos_of[r["spid"]]] == hc.RENTAL_LINE[x] for r, x in zip(prop, shape))  # a card of the slot's line
+            assert R("/rentalplayer/squad/proposal/99999") == {"players": []}
+            for line in hc.LINES:
+                for g in (1, hc.RENTAL_GRADE_MAX):
+                    rows = R(f"/rentalplayer/search/{line}/{g}")["players"]
+                    assert rows and all(r["grade"] == g and r["price"] <= limit * hc.RENTAL_SHARE for r in rows)
+                    assert all(hc.RENTAL_LINE[pos_of[r["spid"]]] == line and hc.on_market(r["spid"]) for r in rows)
+            assert R(f"/rentalplayer/search/FW/{hc.RENTAL_GRADE_MAX + 1}") == R("/rentalplayer/search/FW/0") == {"players": []}
+            # confirm: 11 different players, Market cards, +1..+max, within the limit, once a season
+            pick = [{"spid": r["spid"], "grade": r["grade"]} for r in prop]
+            before = len(hc._state()["teams"][str(hc._default_slot(hc._state()))]["players"])
+            tops = {}  # the five dearest candidates at the top grade (one card a player): over the limit by themselves
+            for r in sorted((r for line in hc.LINES for r in R(f"/rentalplayer/search/{line}/{hc.RENTAL_GRADE_MAX}")["players"]), key=lambda r: -r["price"]):
+                tops.setdefault(r["spid"] % 1000000, {"spid": r["spid"], "grade": r["grade"]})
+            dear = list(tops.values())[:5] + [x for x in pick if x["spid"] % 1000000 not in list(tops)[:5]][:6]
+            bad = lambda **kw: R("/rentalplayer/squad", {"formationid": fid, "players": pick, **kw})
+            assert not bad(players=pick[:10])["result"] and not bad(players=pick[:10] + pick[:1])["result"]
+            assert not bad(formationid=99999)["result"] and not bad(players=[{**pick[0], "grade": hc.RENTAL_GRADE_MAX + 1}] + pick[1:])["result"]
+            assert not bad(players=[{"spid": 1234567, "grade": 1}] + pick[1:])["result"] and not bad(players="x")["result"]
+            assert len(dear) == 11 and sum(hc.card_price(x["spid"], x["grade"]) for x in dear) > limit
+            assert bad(players=dear) == {"result": False, "reason": "RENTAL_SQUAD_POPUP_TITLE_02"}
+            assert len(hc._state()["teams"][str(hc._default_slot(hc._state()))]["players"]) == before and not sent
+            done = R("/rentalplayer/squad", {"formationid": fid, "players": pick})
+            assert done["result"] and done["formationId"] == fid
+            got = [r["body"] for r in done["resources"]]
+            # the game's club gets the cards by a push to the players' partial path, {_id: card}
+            assert sent == [("/coach/me?path=team.players.$", {c["_id"]: c for c in got})] and len(sent[0][1]) == 11
+            assert [(c["spid"], c["grade"]) for c in got] == [(x["spid"], x["grade"]) for x in pick]  # slot order
+            assert all(c["contracttype"] == "rental" and c["state"] == "first" and c["id"] == c["_id"] and c["price"] > 0 for c in got)
+            st = hc._state(); slot = hc._default_slot(st); team = st["teams"][str(slot)]
+            assert len(team["players"]) == before + 11 == len(hc.coach_me(st, slot)["team"]["players"])
+            assert bad() == {"result": False, "reason": "RENTAL_SQUAD_POPUP_TEXT_05"}
+            info = R("/rentalplayer/squad")
+            assert info["completed"] and info["formationid"] == fid and [c["playerid"] for c in info["players"]] == [c["id"] for c in got]
+            assert all(c["contracttype"] == "rental" and c["price"] == hc.card_price(c["spid"], c["grade"]) for c in info["players"])
+            # a rented card is not for sale, release, upgrade or trade
+            rid = got[0]["id"]; card = next(x for x in team["players"] if hc.iid(x) == rid)
+            assert not body(hc.ENDPOINTS["/transfer/offer"]("", json.dumps({"playerobjectid": rid, "price": 1}).encode()))["result"]
+            assert not body(hc.route(f"/player/{rid}")("", b'{"_method": "DELETE"}'))["result"]
+            twin = hc.add_player(team, card["spid"], 1)
+            assert hc.enhance_pair(team, rid, hc.iid(twin)) == (None, None) == hc.enhance_pair(team, hc.iid(twin), rid)
+            hc.remove_player(team, twin)
+            assert hc.card_bound(card) and not hc.card_bound(twin)
+            own = [{"spid": i} for i in range(20)]  # while cards are rented, 18 of the club's own stay
+            assert not hc.rental_keeps({"players": own[:18] + hc.rental_cards(team)}) and hc.rental_keeps({"players": own[:19] + hc.rental_cards(team)})
+            assert hc.rental_keeps({"players": own[:18]}) and not hc.rental_keeps({"players": own + hc.rental_cards(team)}, 3)
+            # scout points: a live match of mine while the squad is rented; a transfer takes RENTAL_COST
+            put = lambda i: R(f"/rentalplayer/{i}", {"_method": "PUT"})
+            for outcome in (1, 0, -1):
+                hc.rental_match(st, outcome)
+            assert hc.my_coach(st)["rental"]["points"] == sum(hc.RENTAL_POINTS); hc._save(st)
+            assert R("/rentalplayer/squad")["scoutpoint"] == sum(hc.RENTAL_POINTS) < hc.RENTAL_COST
+            assert put(rid) == {"result": False, "reason": "INVALID_PARAM"}
+            st = hc._state(); hc.my_coach(st)["rental"]["points"] = hc.RENTAL_COST + 7; hc._save(st)
+            moved = put(rid)
+            assert moved["result"] and moved["scoutpoint"] == 7 and moved["price"] == got[0]["price"] and moved["resources"][0]["uri"] == "/coach/me"
+            assert not put(rid)["result"] and not put("nosuchcard")["result"]
+            assert R(f"/rentalplayer/{rid}") == {}  # a GET of the path: as before
+            st = hc._state(); team = st["teams"][str(slot)]; card = next(x for x in team["players"] if hc.iid(x) == rid)
+            assert card["contracttype"] == "normal" and card["loan"] and "rental" not in card and hc.card_bound(card)
+            assert R("/rentalplayer/squad")["players"][0]["contracttype"] == "normal"
+            assert not body(hc.ENDPOINTS["/transfer/offer"]("", json.dumps({"playerobjectid": rid, "price": 1}).encode()))["result"]
+            # the month ends: the rented cards leave, the transferred one stays, the season starts over
+            assert hc.coach_cards_push(st, slot, gone=["a", "b"]) == ("/coach/me?path=team.players.$", {"a": None, "b": None})
+            assert not hc.rental_expire(st) and hc.rental_expire(st, sid + 1)
+            assert not hc.rental_cards(team) and len(team["players"]) == before + 1 and "rental" not in hc.my_coach(st)
+            left = {hc.iid(x) for x in team["players"]}
+            assert rid in left and all(str(s.get("id") or s["spid"]) in left for s in team["squad"]["positions"])
+            hc._save(st)
+            assert R("/rentalplayer/squad") == {"target": True, "startdate": first, "enddate": last, "scoutpoint": 0, "squadvalue": limit, "completed": False}
+            hc.rental_match(st, 1); assert "rental" not in hc.my_coach(st)  # no squad, no points
+            st = hc._state(); hc.remove_player(st["teams"][str(slot)], next(x for x in st["teams"][str(slot)]["players"] if hc.iid(x) == rid)); hc._save(st)
+        finally:
+            hc.threading.Timer, hc.messenger_push = real_timer, real_push
         # --- delete a manager: PUT /coach/<slot>/postponed -> "postpone" until hideat (restorable with
         # DELETE /coach/<_id>/postponed), then the slot is free and the club data goes with it
         slot = hc._default_slot(hc._state()); cid = hc.coach_id(slot)
@@ -3439,7 +3538,7 @@ def main():
         assert postpone(cid, "DELETE") == {"result": False, "reason": "already removed"}
     finally:
         shutil.rmtree(tmp)
-    print("league + cup + market + upgrade + trade + trade3 + daily + shop + admin + coach delete OK")
+    print("league + cup + market + upgrade + trade + trade3 + daily + shop + admin + loan squad + coach delete OK")
 
 
 if __name__ == "__main__":
