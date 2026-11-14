@@ -26,6 +26,9 @@ the server's staff, fifaaddict has them all at fo3img/staffs/<its id>.png (its 1
 9117..9122 are the client's 11xx..41xx and 9500..9505, http_config.STAFF_CATALOGUE).
 With --leagues, the league logos of the league and cup selection screens (league/ca/l<id>.png;
 issue #36: the cache has one) from fifaaddict's fo3img/league/l<id>.png.
+With --uniforms, the kit pictures the club picker shows (uniforms/j0_<teamid>.png home, j1 away, j2
+third; issue #43: "where to get crest and uniform?", the cache has 21 clubs') from fifaaddict's
+fo3img/uniforms/.
 One request every --delay seconds; existing files are never touched; gamedata/fa_faces.json
 (fa_crests.json, ...) records what was added or is not there (404) so a rerun resumes, and --remove deletes
 only the added files. A refusal or a timeout is not recorded: the run waits longer after each one
@@ -33,7 +36,7 @@ in a row (10 s, doubling, up to 5 min) and gives up after TRIES in a row. --all 
 the small ones first. The admin page's Aset tab runs this in the background; its Stop button
 creates gamedata/assets_fetch.stop, and the run saves its record and quits.
 
-Usage: python -I tools/fa_faces.py [--crests | --staffs | --leagues | --all] [--delay 0.5] [--limit N] [--remove]
+Usage: python -I tools/fa_faces.py [--crests | --uniforms | --staffs | --leagues | --all] [--delay 0.5] [--limit N] [--remove]
 """
 import argparse, hashlib, json, os, re, sys, time, urllib.parse, urllib.request
 
@@ -58,6 +61,7 @@ def fo4_new_players():
     return fo4_season.new_player_cards()
 MANIFESTS = {"faces": os.path.join(ROOT, "gamedata", "fa_faces.json"),
              "crests": os.path.join(ROOT, "gamedata", "fa_crests.json"),
+             "uniforms": os.path.join(ROOT, "gamedata", "fa_uniforms.json"),
              "staffs": os.path.join(ROOT, "gamedata", "fa_staffs.json"),
              "leagues": os.path.join(ROOT, "gamedata", "fa_leagues.json")}
 STOP = os.path.join(ROOT, "gamedata", "assets_fetch.stop")  # admin.ASSET_STOP
@@ -112,6 +116,14 @@ def wanted_crests():
                                          (f"crests/small/s{t}.png", f"{FA}crests/s{t}.png"))]
 
 
+def wanted_uniforms():
+    """[(path under externalAssets, url)] of the club picker's kit pictures, j0 (home), j1 (away) and j2
+    (third) of every club (asked first)."""
+    clubs = [t for _, leagues in hc.club_index() for _, teams in leagues for t in teams]
+    ids = dict.fromkeys(_asked(r"uniforms/j\d_(\d+)\.png") + clubs)
+    return [(f"uniforms/j{k}_{t}.png", f"{FA}uniforms/j{k}_{t}.png") for t in ids for k in range(3)]
+
+
 def wanted_leagues():
     """[(path under externalAssets, url)] of the league logos the league and cup selection screens
     draw (Enums.EXTERNAL_LEAGUE_CA: league/ca/l<leagueid>.png; issue #36, the cache has one):
@@ -131,6 +143,7 @@ def wanted_staffs():
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--crests", action="store_true", help="club crests instead of player faces")
+    ap.add_argument("--uniforms", action="store_true", help="the club picker's kit pictures")
     ap.add_argument("--staffs", action="store_true", help="staff pictures instead of player faces")
     ap.add_argument("--leagues", action="store_true", help="league logos (league and cup selection screens)")
     ap.add_argument("--all", action="store_true", help="every kind, the small ones first")
@@ -138,8 +151,9 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--remove", action="store_true", help="delete the files this tool added")
     a = ap.parse_args(ARGS)
-    kinds = (["staffs", "leagues", "crests", "faces"] if a.all else
-             ["crests" if a.crests else "staffs" if a.staffs else "leagues" if a.leagues else "faces"])
+    kinds = (["staffs", "leagues", "crests", "uniforms", "faces"] if a.all else
+             ["crests" if a.crests else "uniforms" if a.uniforms else "staffs" if a.staffs else
+              "leagues" if a.leagues else "faces"])
     for kind in kinds:
         if not run(kind, a):
             break
@@ -164,7 +178,8 @@ def run(kind, a):
         if os.path.isfile(manifest):
             os.remove(manifest)
         return True
-    jobs = {"crests": wanted_crests, "staffs": wanted_staffs, "leagues": wanted_leagues, "faces": wanted_faces}[kind]()
+    jobs = {"crests": wanted_crests, "uniforms": wanted_uniforms, "staffs": wanted_staffs, "leagues": wanted_leagues,
+            "faces": wanted_faces}[kind]()
     todo = [(rel, urls if isinstance(urls, list) else [urls]) for rel, urls in jobs
             if not os.path.isfile(os.path.join(EXT, rel)) and rel not in man["failed"]]
     if a.limit:

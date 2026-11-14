@@ -1178,9 +1178,10 @@ def label_with_icons(gfx, dds, icons):
     new_defs, x = [], 0
     for season, icon in sorted(icons.items()):
         label = f"{season}season".encode() + b"\0"
+        if any(c == 43 and d == label for sid in ICON_SPRITES for c, d in _tags(sprites[sid][1], 4, len(sprites[sid][1]))):
+            continue  # a game patched before (the season download's Label.big): its icon is there
         for sid in ICON_SPRITES:
             inner = _tags(sprites[sid][1], 4, len(sprites[sid][1]))
-            assert not any(c == 43 and d == label for c, d in inner), f"{season} already in Label.gfx"
             # the '17 frame's shape and its sub-image size
             i = next(k for k, (c, d) in enumerate(inner) if c == 43 and d.startswith(b"17season"))
             place = next(d for c, d in inner[i:] if c == 26)
@@ -1778,7 +1779,8 @@ def engine_db(db, meta, game=r"D:\FO3ID\32795"):
     with his own id, height, weight, nationality and foot; rows stay sorted by player id. Then
     the admin page's rows (photo_heads, card_looks)."""
     import struct, eadb
-    heads = {int(k): v for k, v in json.load(open(HEADS)).items()}
+    # none before the first fetch (a fresh install by setup.exe)
+    heads = {int(k): v for k, v in json.load(open(HEADS)).items()} if os.path.isfile(HEADS) else {}
     t, fld, by, i, raws, base = ng_players(db, meta)
     pk = fld["playerid"][0]
     generic = next(r for r in t.rows if t.get(r, fld["headclasscode"][0]) == 1)

@@ -1,4 +1,4 @@
-[![SEASON UPGRADE 25, 26, WC18](docs/season-upgrade-25-26-wc18.svg)](https://www.mediafire.com/file/505f9vtgtkfu69w/FO3ID-Season-25-26-LIVE-WC18-client.rar/file)
+[![SEASON UPGRADE 25, 26, WC18, SERIE A](docs/season-upgrade-25-26-wc18.svg)](https://www.mediafire.com/file/ettm1y9u3s0r3t2/FO3ID-Season-25-26-LIVE-WC18-SerieA-client.zip/file)
 
 # FO3ID Private Server
 
@@ -35,6 +35,16 @@ Tested in the real client (Indonesian UI):
 - Formation list (the club's own + the game's 33 common formations, read from the client's
   formations table) and manager / player levels: EXP after every match, player LV.1-23
   (+1 to every attribute per level), manager LV.1-100.
+- Issue #44: *Lepas* in the player list releases a card for good (it stayed in the list; not a
+  starter, nor with 18 players left); subs who came on get match EXP too (the unused bench does not);
+  the Quest window's reward boxes show their pictures in shape (they were stretched); the team colors
+  "Red Day Boost" ("Red Devil" in Thai) are Manchester United's ('17 cards / now or formerly at the
+  club), where every club used to get them; the squad lists show each card's form arrow (best to
+  worst, new every day at 00:00 WIB; what the game does with form in a match is not checked).
+  *Kontrak pemain* (FO3's craft) works: the 30 best Legend players, each for 10 of his player
+  pieces, a "Kontrak pemain" item (Shop) and 5% of his price in EP; a "Kotak player piece" (Shop,
+  and a default match reward card; the admin page can put it in any reward) gives 1-3 pieces of one. The admin page's
+  Shop tab changes the list (any cards), the pieces, the fee and the grade.
 - Game sound and the EA Trax menu music. `tools/eatrax_song.py` puts your own song first in it,
   but the game then crashes after matches (see the known issue below).
 - Admin web page on http://127.0.0.1:8088/ (EP, players, packs, gifts, daily rewards, match rewards, match settings, economy, AI chat, Shop, log)
@@ -194,10 +204,12 @@ Added, passing the tests but not yet checked in the client:
   low and selling high pays. Presets: Easy (as before: free Shop, fixed prices), Realistic (a paid
   Shop at the cards' worth, the dynamic Market, 300,000 starting EP) and Hard (prices x2, 100,000
   EP). Match EP stays on the Match rewards tab.
-  While the Shop is paid, nothing makes EP by itself: an Upgrade costs what it adds on average (a
-  restore costs EP), a Tukar or Scout offer is worth at most the cards given, a League Simulation
-  coupon costs what its round pays, and with the dynamic Market a pack costs its cards' worth at
-  their dearest (+13%), as it can be opened on any day.
+  While the Shop is paid, a League Simulation coupon costs what its round pays, and with the dynamic
+  Market a pack costs its cards' worth at their dearest (+13%), as it can be opened on any day. The
+  Strict rules switch (on in Hard) keeps Upgrade, Tukar and Scout from making EP: an Upgrade costs
+  what it adds on average (a restore costs EP), a Tukar or Scout offer is worth at most the cards
+  given. Off (Easy, Realistic) the game's own rules apply: an Upgrade costs 2% of the card's value, a
+  restore takes upgrade points, offers have no cap.
   Items with no EP in them (boosts, upgrade points, EXP capsules, a name or team change) have a set
   price times the player price setting, so Hard doubles it.
   A change reaches a running game: the server tells it to drop the Shop list it keeps for the
@@ -293,7 +305,7 @@ Added, passing the tests but not yet checked in the client:
   faces (each card's season picture and the player's), club crests, league logos and staff pictures
   from fifaaddict.com in the background (one
   kind at a time; stop and resume at any time). It runs `tools/fa_faces.py`, which also takes
-  `--leagues` now. The game setting screen's "Default ball" shows the EA SPORTS ball, small flags
+  `--leagues` and `--uniforms` (the club picker's kit pictures, issue #43) now. The game setting screen's "Default ball" shows the EA SPORTS ball, small flags
   use the big ones, and the cup screens get their trophy and skin.
   Player pictures fifaaddict lacks (or refuses) come from FC Online (FO4) instead (same EA player id;
   the server's new players get their FO4 cards' pictures from fifaaddict), the scan covers every card of the DB, a refusal makes it wait longer
@@ -380,7 +392,7 @@ Added, passing the tests but not yet checked in the client:
   ones from their pictures.
 - **Classic FO3 world** (issue #38): the Database tab's *Dunia game* picks Modern (the AI clubs, the
   club picker and This Season packs use 26 LIVE cards, as before; own seasons also show in the Market
-  search) or Classic FO3: every club plays FO3's own 2017 squad, This Season is '17, and the added seasons
+  search) or Classic FO3: every club plays FO3's own 2017 squad (AC Milan, Genoa, Udinese, Bologna, Cagliari and Sampdoria, which FO3 ID never had, their FO3 cards of every year; issue #43), This Season is '17, and the added seasons
   (25 / 26 LIVE, WC18, own seasons) are in no pack, Market, trade or virtual manager's squad: only the
   admin page gives them. Your club and collection stay as they are, and FO3's own cards are never
   overwritten (new seasons are added next to them). Saved in `gamedata/world.json`; counts after a
@@ -466,6 +478,17 @@ Not done: online play against other people (ranked PvP, friendly, King of the Hi
 - Optional: ffmpeg (only for `tools/eatrax_song.py`).
 
 ## Setup
+
+**Easiest: setup.exe.** Close the game and run `FO3ID-Server-Setup-<version>.exe`: it asks for the
+FO3 ID game folder, installs the server with a Python of its own (to `C:\FO3ID Server`), makes the
+certificate, adds the hosts entry, extracts the player database, patches the game
+(`installer/setup_pc.py`, its log in `installer/setup.log`) and puts an **FO3ID** shortcut on the
+desktop: double-click it to play. No game files are inside, so the game must be installed already;
+FO4 seasons, club careers and 3D faces come with the tools below. Uninstalling puts the game's
+original files back. To build it: `python installer/build.py` (needs Inno Setup 6; it fetches its own
+Python and packages once).
+
+By hand:
 
 1. Extract the player database from your client:
    `python extract_fifadb.py D:\FO3ID\32795` → `gamedata/fifadb.sqlite`.

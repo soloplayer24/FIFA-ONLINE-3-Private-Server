@@ -293,6 +293,28 @@
           <button class="b primary" id="listsSave" data-i18n="lists_save"></button>
         </div>
       </div>
+      <h3 data-i18n="cr_title"></h3>
+      <p class="lead" id="crLead"></p>
+      <div class="row">
+        <label class="f"><span data-i18n="cr_pieces"></span><input type="number" id="crPieces" min="1" max="99"></label>
+        <label class="f"><span data-i18n="cr_fee"></span><input type="number" id="crFee" min="0" max="100" step="0.5"></label>
+        <label class="f"><span data-i18n="grade"></span><select id="crGrade"></select></label>
+        <label class="f"><span data-i18n="cr_count"></span><input type="number" id="crCount" min="1" max="200"></label>
+      </div>
+      <p class="muted" id="crNote"></p>
+      <div class="table-wrap"><table>
+        <thead><tr><th data-i18n="th_name"></th><th class="num" data-i18n="th_season"></th><th class="num">OVR</th><th class="num" data-i18n="th_value"></th><th class="num" data-i18n="cr_th_fee"></th><th></th></tr></thead>
+        <tbody id="crRows"></tbody>
+      </table></div>
+      <form class="row" id="crSearch">
+        <label class="f"><span data-i18n="cr_add"></span><input class="wide" id="crQ" minlength="2" data-i18n-ph="ph_messi" required></label>
+        <button class="b" data-i18n="search"></button>
+      </form>
+      <div class="table-wrap"><table><tbody id="crFound"></tbody></table></div>
+      <div class="row">
+        <button class="b primary" id="crSave" data-i18n="save"></button>
+        <button class="b" id="crReset" data-i18n="cr_reset"></button>
+      </div>
     </section>
 
     <section id="harian" hidden>
@@ -423,6 +445,7 @@
         <label class="f"><span data-i18n="eco_packs"></span><input type="number" id="ecoPacks" min="0.1" max="100" step="0.1"></label>
         <label class="f"><span data-i18n="eco_start"></span><input type="number" id="ecoStart" min="0" step="1000"></label>
         <label class="check"><input type="checkbox" id="ecoDynamic"> <span data-i18n="eco_dynamic"></span></label>
+        <label class="check"><input type="checkbox" id="ecoStrict"> <span data-i18n="eco_strict"></span></label>
         <button class="b primary" id="ecoSave" data-i18n="save"></button>
       </div>
     </section>
@@ -789,7 +812,7 @@ const loaders = {
   },
   async tambah() { if (found) renderSearch(); },
   async item() { await packsReady; await loadStaff(); },
-  async shop() { await loadShop(); },
+  async shop() { await loadShop(); await loadCraft(); },
   async harian() {
     await packsReady;
     const d = await api("daily"), st = d.status;
@@ -833,7 +856,7 @@ const loaders = {
   async economy() {
     const d = await api("economy");
     $("#ecoPreset").innerHTML = ["custom", "easy", "real", "hard"].map(k => `<option value="${k}">${esc(t("eco_" + k))}</option>`).join("");
-    ecoFill({shopfree: d.shopfree, players: d.players, packs: d.packs, start_ep: d.start_ep, dynamic: d.dynamic});
+    ecoFill({shopfree: d.shopfree, players: d.players, packs: d.packs, start_ep: d.start_ep, dynamic: d.dynamic, strict: d.strict});
     $("#ecoPreset").value = Object.keys(ECO_PRESETS).find(k => JSON.stringify(ECO_PRESETS[k]) === JSON.stringify(ecoRead())) || "custom";
   },
   async chat() {
@@ -1060,6 +1083,48 @@ const product = id => SHOP.products.find(p => p.itemid === Number(id));
 const pname = id => id === SHOP.ep_item ? "EP" : id === SHOP.es_item ? t("upgrade_point") : (product(id)?.name ?? String(id));
 const optList = (kinds, val, extra = []) => extra.map(([v, n]) => `<option value="${v}"${v == val ? " selected" : ""}>${esc(n)}</option>`).join("")
   + SHOP.products.filter(p => kinds.includes(p.kind)).map(p => `<option value="${p.itemid}"${p.itemid == val ? " selected" : ""}>${esc(p.name)} · ${p.itemid}</option>`).join("");
+
+// Kontrak pemain (issue #44): the craft list. crCustom = the list is the admin's own; false = the default list,
+// saved as players [] so it keeps following "count"
+let crList = [], crCustom = false, crFoundRows = [];
+function renderCraft() {
+  $("#crNote").textContent = crList.length ? t(crCustom ? "cr_custom" : "cr_default", crList.length) : t("cr_none");
+  $("#crRows").innerHTML = crList.map((r, i) => `<tr><td>${esc(r.name)} <span class="muted">${r.spid}</span></td>
+    <td class="num">${r.season}</td><td class="num">${r.ovr}</td><td class="num">${r.price != null ? fmt(r.price) : ""}</td>
+    <td class="num">${r.fee != null ? fmt(r.fee) : ""}</td>
+    <td><button class="b small danger" data-cr-del="${i}">${esc(t("remove"))}</button></td></tr>`).join("");
+}
+async function loadCraft(d) {
+  d = d || await api("craft");
+  $("#crLead").textContent = t("cr_lead", d.file);
+  $("#crPieces").value = d.pieces; $("#crFee").value = d.fee; $("#crCount").value = d.count;
+  $("#crGrade").innerHTML = gradeOpts(d.grade);
+  crList = d.players; crCustom = d.custom; renderCraft();
+}
+$("#crRows").addEventListener("click", e => {
+  const i = e.target.dataset.crDel;
+  if (i !== undefined) { crList.splice(Number(i), 1); crCustom = true; renderCraft(); }
+});
+$("#crSearch").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    crFoundRows = (await api("search?q=" + encodeURIComponent($("#crQ").value.trim()))).rows.filter(r => r.season > 0);  // not engine cards
+    $("#crFound").innerHTML = crFoundRows.map((r, i) => `<tr><td>${esc(r.name)} <span class="muted">${r.spid}</span></td>
+      <td class="num">${r.season}</td><td>${r.pos}</td><td class="num">${r.ovr}</td><td class="num">${fmt(r.price)}</td>
+      <td><button class="b small" data-cr-add="${i}">${esc(t("cr_pick"))}</button></td></tr>`).join("")
+      || `<tr><td class="muted">${esc(t("no_card"))}</td></tr>`;
+  } catch (err) { say(t("search_failed") + err.message, "err"); }
+});
+$("#crFound").addEventListener("click", e => {
+  const r = crFoundRows[e.target.dataset.crAdd];
+  if (!r) return;
+  if (!crList.some(x => x.spid === r.spid)) crList.push({spid: r.spid, name: r.name, season: r.season, ovr: r.ovr});
+  crCustom = true; renderCraft();
+});
+$("#crSave").addEventListener("click", () => act(async () => loadCraft(await api("craft_set", {
+  players: crCustom ? crList.map(r => r.spid) : [], pieces: Number($("#crPieces").value), fee: Number($("#crFee").value),
+  grade: Number($("#crGrade").value), count: Number($("#crCount").value)})), t("cr_saved")));
+$("#crReset").addEventListener("click", () => act(async () => loadCraft(await api("craft_set", {reset: true})), t("cr_saved")));
 
 async function loadShop() {
   SHOP = await api("shop");
@@ -1415,18 +1480,19 @@ $("#mrSave").addEventListener("click", () => act(async () => {
 }, t("mr_saved")));
 // the economy presets (issue #30): easy = this server as it always was
 const ECO_PRESETS = {
-  easy: {shopfree: true, players: 1, packs: 1, start_ep: 1000000, dynamic: false},
-  real: {shopfree: false, players: 1, packs: 1, start_ep: 300000, dynamic: true},
-  hard: {shopfree: false, players: 2, packs: 1, start_ep: 100000, dynamic: true},  // packs: their cards x2 already
+  easy: {shopfree: true, players: 1, packs: 1, start_ep: 1000000, dynamic: false, strict: false},
+  real: {shopfree: false, players: 1, packs: 1, start_ep: 300000, dynamic: true, strict: false},  // the game's own rules
+  hard: {shopfree: false, players: 2, packs: 1, start_ep: 100000, dynamic: true, strict: true},  // packs: their cards x2 already
 };
 const ecoRead = () => ({shopfree: $("#ecoShopFree").checked, players: Number($("#ecoPlayers").value),
-  packs: Number($("#ecoPacks").value), start_ep: Number($("#ecoStart").value), dynamic: $("#ecoDynamic").checked});
+  packs: Number($("#ecoPacks").value), start_ep: Number($("#ecoStart").value), dynamic: $("#ecoDynamic").checked,
+  strict: $("#ecoStrict").checked});
 function ecoFill(e) {
   $("#ecoShopFree").checked = e.shopfree; $("#ecoPlayers").value = e.players; $("#ecoPacks").value = e.packs;
-  $("#ecoStart").value = e.start_ep; $("#ecoDynamic").checked = e.dynamic;
+  $("#ecoStart").value = e.start_ep; $("#ecoDynamic").checked = e.dynamic; $("#ecoStrict").checked = e.strict;
 }
 $("#ecoPreset").addEventListener("change", () => { const p = ECO_PRESETS[$("#ecoPreset").value]; if (p) ecoFill(p); });
-["#ecoShopFree", "#ecoPlayers", "#ecoPacks", "#ecoStart", "#ecoDynamic"].forEach(s =>
+["#ecoShopFree", "#ecoPlayers", "#ecoPacks", "#ecoStart", "#ecoDynamic", "#ecoStrict"].forEach(s =>
   $(s).addEventListener("input", () => { $("#ecoPreset").value = "custom"; }));
 $("#ecoSave").addEventListener("click", () => act(async () => {
   await api("economy_set", ecoRead());

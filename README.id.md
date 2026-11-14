@@ -1,4 +1,4 @@
-[![SEASON UPGRADE 25, 26, WC18](docs/season-upgrade-25-26-wc18.svg)](https://www.mediafire.com/file/505f9vtgtkfu69w/FO3ID-Season-25-26-LIVE-WC18-client.rar/file)
+[![SEASON UPGRADE 25, 26, WC18, SERIE A](docs/season-upgrade-25-26-wc18.svg)](https://www.mediafire.com/file/ettm1y9u3s0r3t2/FO3ID-Season-25-26-LIVE-WC18-SerieA-client.zip/file)
 
 # FO3ID Private Server
 
@@ -37,6 +37,16 @@ Diuji di client asli (UI bahasa Indonesia):
 - Daftar formasi (formasi klub sendiri + 33 formasi umum game, dibaca dari tabel formasi client)
   dan level manager / pemain: EXP setelah tiap pertandingan, pemain LV.1-23 (+1 ke semua atribut
   per level), manager LV.1-100.
+- Issue #44: *Lepas* di daftar pemain melepas kartu untuk selamanya (dulu pemainnya tetap ada; tidak
+  untuk pemain inti, atau kalau pemain tinggal 18); pemain cadangan yang masuk juga dapat EXP (bangku
+  yang tidak main tidak); kotak hadiah jendela Quest menampilkan gambarnya dengan bentuk yang benar
+  (dulu gepeng); team color "Red Day Boost" ("Red Devil" di bahasa Thai) milik Manchester United
+  (kartu '17 / pemain yang sekarang atau dulu di klub itu), dulu didapat semua klub; daftar skuad
+  menampilkan panah form tiap kartu (terbaik sampai terburuk, baru tiap hari jam 00:00 WIB; efek form
+  di pertandingan belum dicek). *Kontrak pemain* (craft FO3) jalan: 30 pemain Legend terbaik, masing-masing
+  untuk 10 player piece-nya, item "Kontrak pemain" (Shop) dan 5% harganya dalam EP; "Kotak player piece"
+  (Shop, dan kartu hadiah pertandingan bawaan; admin bisa memasangnya di hadiah mana pun) berisi 1-3 piece satu pemain.
+  Tab Shop di admin mengubah daftarnya (kartu apa saja), jumlah piece, biaya dan grade.
 - Suara game dan musik menu EA Trax. `tools/eatrax_song.py` menaruh lagumu sendiri di urutan
   pertama, tapi game lalu crash setelah pertandingan (lihat masalah yang diketahui di bawah).
 - Halaman admin web di http://127.0.0.1:8088/ (EP, pemain, pak, hadiah, hadiah harian, hadiah match, pengaturan match, ekonomi, chat AI, Shop, log)
@@ -207,10 +217,12 @@ Sudah ditambahkan dan lolos tes, tapi belum dicek di client:
   itu menguntungkan. Preset: Santai (seperti sebelumnya: Shop gratis, harga tetap), Realistis (Shop
   berbayar seharga nilai kartunya, pasar dinamis, EP awal 300.000), dan Sulit (harga x2,
   EP awal 100.000). EP dari match tetap diatur di tab Hadiah match.
-  Selama Shop berbayar, tidak ada cara mencetak EP: biaya Upgrade sebesar nilai yang rata-rata
-  ditambahkannya (restore dibayar EP), tawaran Tukar dan Scout paling tinggi senilai kartu yang
-  diserahkan, kupon Simulasi Liga seharga hadiah satu rondenya, dan dengan pasar dinamis pak seharga
-  nilai kartunya di harga tertinggi (+13%), karena pak bisa dibuka kapan saja.
+  Selama Shop berbayar, kupon Simulasi Liga seharga hadiah satu rondenya, dan dengan pasar dinamis pak
+  seharga nilai kartunya di harga tertinggi (+13%), karena pak bisa dibuka kapan saja. Pilihan Aturan
+  ketat (aktif di Sulit) membuat Upgrade, Tukar dan Scout tidak mencetak EP: biaya Upgrade sebesar
+  nilai yang rata-rata ditambahkannya (restore dibayar EP), tawaran Tukar dan Scout paling tinggi
+  senilai kartu yang diserahkan. Tanpa itu (Santai, Realistis) berlaku aturan game asli: biaya Upgrade
+  2% dari nilai kartu, restore dengan poin upgrade, tawaran tanpa batas.
   Barang tanpa EP di dalamnya (boost, poin upgrade, kapsul EXP, ganti nama atau tim) punya harga
   dasar dikali pengali harga pemain, jadi di Sulit harganya dua kali lipat.
   Perubahan langsung sampai ke game yang sedang jalan: server menyuruh game membuang daftar Shop yang
@@ -314,7 +326,7 @@ Sudah ditambahkan dan lolos tes, tapi belum dicek di client:
   tiap kartu dan foto pemainnya), logo
   klub, logo liga, dan foto staff yang belum ada dari fifaaddict.com di latar belakang (satu jenis dalam
   satu waktu; bisa dihentikan dan dilanjutkan kapan saja). Tab ini menjalankan `tools/fa_faces.py`, yang
-  sekarang juga menerima `--leagues`. "Default ball" di layar pengaturan game menampilkan bola EA SPORTS,
+  sekarang juga menerima `--leagues` dan `--uniforms` (gambar seragam di pemilih klub, issue #43). "Default ball" di layar pengaturan game menampilkan bola EA SPORTS,
   bendera kecil memakai gambar bendera besar, dan layar Cup mendapat trofi dan skin-nya.
   Foto pemain yang tidak ada (atau ditolak) di fifaaddict diambil dari FC Online (FO4) (id pemain EA
   yang sama; pemain baru server dapat gambar kartu FO4-nya dari fifaaddict), pemindaian mencakup semua kartu di database, penolakan
@@ -402,7 +414,7 @@ Sudah ditambahkan dan lolos tes, tapi belum dicek di client:
   dari ikon* membuat ulang wajah yang sudah ada.
 - **Dunia FO3 klasik** (issue #38): *Dunia game* di tab Database memilih Modern (klub AI, pilihan klub
   dan pak This Season memakai kartu 26 LIVE, seperti sebelumnya; musim buatan juga muncul di pencarian
-  Market) atau Klasik FO3: semua klub memakai skuad 2017 asli FO3, This Season = '17, dan musim tambahan
+  Market) atau Klasik FO3: semua klub memakai skuad 2017 asli FO3 (AC Milan, Genoa, Udinese, Bologna, Cagliari dan Sampdoria, yang tidak pernah ada di FO3 ID, memakai kartu FO3 mereka dari semua tahun; issue #43), This Season = '17, dan musim tambahan
   (25 / 26 LIVE, WC18, musim buatan) tidak ada di pak, Market, Tukar maupun skuad manajer virtual: hanya
   halaman admin yang bisa memberikannya. Klub dan koleksimu tidak berubah, dan kartu asli FO3 tidak pernah
   ditimpa (musim baru ditambahkan di sampingnya). Tersimpan di `gamedata/world.json`; berlaku setelah
@@ -493,6 +505,16 @@ Belum dikerjakan: main online melawan orang lain (ranked PvP, friendly, King of 
 - Opsional: ffmpeg (hanya untuk `tools/eatrax_song.py`).
 
 ## Pemasangan
+
+**Paling mudah: setup.exe.** Tutup game lalu jalankan `FO3ID-Server-Setup-<versi>.exe`: ia menanyakan
+folder game FO3 ID, memasang server beserta Python-nya sendiri (ke `C:\FO3ID Server`), membuat
+sertifikat, menambah entri hosts, mengekstrak database pemain, mem-patch game (`installer/setup_pc.py`,
+lognya di `installer/setup.log`) dan membuat shortcut **FO3ID** di desktop: klik dua kali untuk main.
+Tidak ada file game di dalamnya, jadi game harus sudah terpasang; season FO4, karir klub dan wajah 3D
+didapat lewat tools di bawah. Uninstall mengembalikan file asli game. Cara membuatnya:
+`python installer/build.py` (butuh Inno Setup 6; Python dan paketnya diunduh sekali).
+
+Secara manual:
 
 1. Ekstrak database pemain dari client-mu:
    `python extract_fifadb.py D:\FO3ID\32795` → `gamedata/fifadb.sqlite`.

@@ -90,6 +90,22 @@ def _current_season():
     return FO4_SEASON if hit else LEGACY_SEASON
 
 
+_OPEN = []
+
+
+def open_clubs():
+    """The clubs FO3 ID never had (tools/fo4_season.py OPEN_CLUBS: AC Milan, Genoa, Udinese, Bologna,
+    Cagliari, Sampdoria). FO3 has a few 2017 cards of theirs, so in the classic world their squads are
+    FO3's cards of every year (issue #43: "Does AC Milan ... work in Classic FO3 Game world setting?")."""
+    if not _OPEN:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("fo4_season", os.path.join(HERE, "tools", "fo4_season.py"))
+        fo4 = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fo4)
+        _OPEN[:] = sorted(fo4.OPEN_CLUBS)
+    return _OPEN
+
+
 WORLD = world()  # as the server started (the admin page tells a newer choice apart)
 CURRENT_SEASON = _current_season()
 # fifadb leagueid of the national teams ("International"). A national team's squad is its
@@ -116,13 +132,17 @@ def team(c, teamid):
     if teamid <= 0:  # no card has one; nationalteamid -1 = none (would match 53k cards)
         return None
     # with 26 LIVE current, a player who has a 26 LIVE card plays for that card's club only (his
-    # 2017 card is at his 2017 club); then 2017 cards, then older ones
-    rows = c.execute("""SELECT p.* FROM players p JOIN permid m ON m.spid = p.spid AND m.licensed = 1
-                        WHERE ?1 IN (p.teamid, p.nationalteamid)
+    # 2017 card is at his 2017 club); then 2017 cards, then older ones. In the 2017 world (classic)
+    # FO3's own cards only, and a club FO3 ID never had also takes its FO3 cards of other years that
+    # are not licensed for ID (the Rest of the World players fo4_season moved there)
+    classic = CURRENT_SEASON == LEGACY_SEASON
+    added = ",".join(map(str, hc.ADDED_SEASONS)) if classic else "-1"
+    rows = c.execute(f"""SELECT p.* FROM players p JOIN permid m ON m.spid = p.spid AND (m.licensed = 1 OR ?4)
+                        WHERE ?1 IN (p.teamid, p.nationalteamid) AND p.spid / 1000000 NOT IN ({added})
                         AND (?2 = ?3 OR p.spid / 1000000 = ?2
                              OR p.playerid NOT IN (SELECT playerid FROM players WHERE spid / 1000000 = ?2))
                         ORDER BY (p.spid / 1000000 != ?2), (p.spid / 1000000 != ?3), (p.spid < 1000000), p.spid""",
-                     (teamid, CURRENT_SEASON, LEGACY_SEASON)).fetchall()
+                     (teamid, CURRENT_SEASON, LEGACY_SEASON, classic and teamid in open_clubs())).fetchall()
     national = any(r["nationalteamid"] == teamid for r in rows)
     best = {}
     # the club's current-season cards (as on fifaaddict); older seasons (former players, e.g.

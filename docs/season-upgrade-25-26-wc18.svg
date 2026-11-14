@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-labelledby="t d">
-  <title id="t">Season upgrade 25 LIVE, 26 LIVE, WC18</title>
-  <desc id="d">New seasons for FIFA Online 3: 26 LIVE and 25 LIVE from FIFA Online 4, and WC18, the 2018 World Cup's best 300 squad players. What only this server has: 1,000 AI managers, a living Market, FO3's staff and 190+ team colors, full Liga and Cup, an admin web panel in 6 languages, AI chat and Messenger.</desc>
+  <title id="t">Season upgrade 25 LIVE, 26 LIVE, WC18, Serie A clubs</title>
+  <desc id="d">New seasons for FIFA Online 3: 26 LIVE and 25 LIVE from FIFA Online 4, WC18, the 2018 World Cup's best 300 squad players, and the Serie A clubs FO3 ID lacked: AC Milan, Genoa, Udinese, Bologna, Cagliari and Sampdoria. What only this server has: 2,000 AI managers, Rank and King of the Hill with extra time and penalties, a living Market, FO3's staff, Player Growth and 190+ team colors, full Liga and Cup, an admin web panel in 6 languages, AI chat and Messenger, and a setup.exe.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0d1b2a"/>
@@ -26,13 +26,14 @@
   <rect width="1200" height="470" rx="16" fill="url(#bg)"/>
   <!-- a halfway line and a centre circle behind the badges, faint -->
   <circle cx="948" cy="112" r="96" fill="none" stroke="#1fdc72" stroke-opacity="0.10" stroke-width="4"/>
-  <rect x="0" y="222" width="1200" height="3" fill="url(#pitch)"/>
+  <rect x="0" y="236" width="1200" height="3" fill="url(#pitch)"/>
 
   <!-- title -->
   <text x="56" y="92" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="52" font-weight="900" letter-spacing="3" fill="#ffffff">SEASON UPGRADE</text>
   <text x="58" y="134" font-family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="23" font-weight="700" fill="#8fd9b0">New seasons for FIFA Online 3</text>
   <text x="58" y="166" font-family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="20" fill="#d3e0d9">26 LIVE + 25 LIVE from FIFA Online 4</text>
   <text x="58" y="194" font-family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="20" fill="#d3e0d9">WC18: the 2018 World Cup's best 300 squad players</text>
+  <text x="58" y="222" font-family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="20" fill="#d3e0d9"><tspan font-weight="700" fill="#ffffff">Serie A back:</tspan> AC Milan, Genoa, Udinese, Bologna, Cagliari, Sampdoria</text>
 
   <!-- season badges: FO4's 25 / 26 (dark plate, green number) and WC18 in FO3's World Cup style -->
   <g font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="66" text-anchor="middle">
@@ -61,7 +62,7 @@
       <rect x="816" y="352" width="4" height="46" rx="2"/>
     </g>
     <g font-size="20" font-weight="700" fill="#ffffff">
-      <text x="72" y="300">1,000 AI managers</text>
+      <text x="72" y="300">2,000 AI managers</text>
       <text x="452" y="300">A living Market</text>
       <text x="832" y="300">FO3's systems back</text>
       <text x="72" y="370">Full Liga and Cup</text>
@@ -69,14 +70,14 @@
       <text x="832" y="370">AI chat and Messenger</text>
     </g>
     <g font-size="16" fill="#b7c7bf">
-      <text x="72" y="324">Rankings and real Rank matches</text>
+      <text x="72" y="324">Rank, King of the Hill, extra time</text>
       <text x="452" y="324">AI buyers and sellers, price graphs</text>
-      <text x="832" y="324">Staff, 190+ team colors, missions</text>
+      <text x="832" y="324">Staff, Player Growth, team colors</text>
       <text x="72" y="394">Seasons, tables, knock-outs, rewards</text>
       <text x="452" y="394">EP, players, packs, Shop, 6 languages</text>
       <text x="832" y="394">Friends online, banter in 3 languages</text>
     </g>
   </g>
 
-  <text x="56" y="444" font-family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="16" fill="#8fd9b0">Offline on one PC, no Garena servers needed. Click the banner to download the client files.</text>
+  <text x="56" y="444" font-family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="16" fill="#8fd9b0">Offline on one PC with setup.exe, no Garena servers needed. Click the banner to download the client files.</text>
 </svg>

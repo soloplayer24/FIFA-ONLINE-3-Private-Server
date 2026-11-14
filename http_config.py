@@ -20,7 +20,7 @@ https://APSEODESK172 (port 443) for /info/server/locale etc. — no launch arg
 overrides it — so run `http_config.py 443 --tls` and map APSEODESK172 to
 127.0.0.1 in the hosts file.
 """
-import bisect, calendar, collections, copy, functools, gzip, html, http.server, math, os, random, re, socket, sqlite3, ssl, statistics, sys, threading, time, urllib.parse
+import bisect, calendar, collections, copy, functools, glob, gzip, hashlib, html, http.server, math, os, random, re, socket, sqlite3, ssl, statistics, struct, sys, threading, time, urllib.parse, zlib
 from contextlib import closing
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -135,8 +135,42 @@ def asset_path(rel):
     return None
 
 
+# The Quest window's reward boxes (AchievementQuestRewardBox) stretch their picture to a 174 x 140 frame
+# in a container scaled 0.977 wide, i.e. 170 x 140 on screen; Shop icons are 170 x 120 and came out
+# 17% too tall (issue #44). gp_shop_list names them QUEST_ICON + icon, served padded to 170:140.
+QUEST_ICON, QUEST_BOX = "quest_", 170 / 140
+
+
+def pad_png(data, aspect):
+    """data (a PNG) with transparent rows above and below up to width / height = aspect. Only 8-bit
+    RGBA or gray+alpha, not interlaced (every Shop icon); anything else comes back as it is. Zero rows
+    are transparent there, and the first row's filter read zeros above it anyway, so the image data
+    stays byte for byte."""
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        return data
+    chunks, p = [], 8
+    while p + 8 <= len(data):
+        n, kind = struct.unpack(">I4s", data[p:p + 8])
+        chunks.append((kind, data[p + 8:p + 8 + n])); p += 12 + n
+    w, h, depth, ctype, _, _, inter = struct.unpack(">IIBBBBB", chunks[0][1])
+    total = round(w / aspect)
+    if depth != 8 or ctype not in (4, 6) or inter or total <= h:
+        return data
+    row = b"\0" * (1 + w * (4 if ctype == 6 else 2))  # filter byte 0 + transparent pixels
+    top = (total - h) // 2
+    raw = row * top + zlib.decompress(b"".join(c for k, c in chunks if k == b"IDAT")) + row * (total - h - top)
+    chunk = lambda k, c: struct.pack(">I", len(c)) + k + c + struct.pack(">I", zlib.crc32(k + c))
+    return (data[:8] + chunk(b"IHDR", struct.pack(">IIBBBBB", w, total, depth, ctype, 0, 0, 0))
+            + b"".join(chunk(k, c) for k, c in chunks[1:] if k not in (b"IDAT", b"IEND"))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+
 def cdn_file(rel):
     """(content-type, bytes) of an asset, or None (-> 404, client shows its default)."""
+    m = re.fullmatch(r"externalAssets/shop/" + QUEST_ICON + r"(\w+)\.png", rel)
+    if m:
+        hit = cdn_file(f"externalAssets/shop/{m[1]}.png")
+        return hit and (hit[0], pad_png(hit[1], QUEST_BOX))
     f = asset_path(rel)
     if f is None:
         return None
@@ -752,7 +786,11 @@ LANG_ADD = {"STAFFPACK_NAME_11": "Technical Director Pack<BR>(3.0~5.0 star)",
             "STAFFPACK_DESC_11": 'You can get 1 technical director.<br><br><FONT color="#d8a300">Grade: 3.0~5.0 star</font>',
             "STAFFPACK_DESC_12": 'You can get 1 premium staff.<br><br><FONT color="#d8a300">Staff: fitness coach, '
                                  'technical director, head coach<br>Grade: 3.0~5.0 star</font>',
-            "STAFFPACK_DESC_13": 'You can get 1 fitness coach.<br><br><FONT color="#d8a300">Grade: 1.0~3.0 star</font>'}
+            "STAFFPACK_DESC_13": 'You can get 1 fitness coach.<br><br><FONT color="#d8a300">Grade: 1.0~3.0 star</font>',
+            # Kontrak pemain's preview (issue #44; the Indonesian pack has none): {0} pieces short, {1} the contract
+            "CRAFTSYSTEM_NOTICE01": "Butuh {0} player piece lagi dan {1}.",
+            "CRAFTSYSTEM_NOTICE02": "Butuh {0} player piece lagi.",
+            "CRAFTSYSTEM_NOTICE03": "Butuh {0}."}
 LANG_FIXES = {b'"COMMON_TIME_DAY": "Waktu"': b'"COMMON_TIME_DAY": "Siang"',
               b'"COMMON_WEATHER_DUSK": "Malam"': b'"COMMON_WEATHER_DUSK": "Mendung"',
               # Live Boost's one group (LIVEBOOST_GROUP) is the Team of the Week
@@ -1557,8 +1595,10 @@ TC_NAMED_SPECIALS = (  # (TEAM<id>, description, SQL condition on players p, boo
     (20031, "Shevchenko dan Kaka", _PIDS(13128, 138449), _TC_OVR, None),
     (20032, "Terry, Lampard, Drogba, Cech", _PIDS(13732, 5471, 31432, 48940), _TC_OVR, None),
     (20033, "Figo, Ronaldo, Beckham, Raul, Roberto Carlos, Casillas", _PIDS(5589, 37576, 250, 45661, 1040, 5479), _TC_OVR, None),
-    (20028, "Pemain season '17", _S(88), _TC_OVR, None),
-    (20029, "Pemain season apa saja", "1", ("", "ovr", 1), None),
+    # "Red Day Boost (Current / All Seasons)", the Thai pack's "Red Devil": Manchester United (issue #44:
+    # as "'17 cards" and "any card" every club had them)
+    (20028, "Pemain Manchester United season '17", f"{_S(88)} AND p.teamid = 11", _TC_OVR, None),
+    (20029, "Pemain Manchester United (sekarang atau dulu)", _CLUB(11), _TC_OVR, None),
     (20043, "Pemain season legenda", _S(*TC_LEGENDS), ("", "ovr", 4), None),
     (40001, "50 kartu terbaik", "1", _TC_OVR, 50),
     (40002, "100 kartu terbaik", "1", _TC_OVR, 100),
@@ -1826,6 +1866,22 @@ def preset_squads(team):
     return out
 
 
+# Form (issue #44: "Player form showing arrow in front of player name"): a card's condition, the arrow
+# the squad lists put before the name (PlayerListItemTeamColorRenderer.getConditionName: <= -5 worst,
+# <= -2 bad, 0 normal, <= 2 good, more best; no condition, no arrow). Each card's form is drawn anew
+# every day at 00:00 WIB, mostly normal. Not verified: what native does with it in a match.
+FORMS = ((-5, 1), (-2, 3), (0, 8), (2, 3), (5, 1))  # (condition, weight)
+
+
+def player_form(card_id, day=None):
+    roll = int.from_bytes(hashlib.sha1(f"{day or today_wib()}:{card_id}".encode()).digest()[:4], "big")
+    roll %= sum(w for _, w in FORMS)
+    for form, w in FORMS:
+        if roll < w:
+            return form
+        roll -= w
+
+
 def owned_team(raw):
     """A stored team ({players:[{spid,...}], squad:{positions,captain,kickers,...}}) in the
     shape the client expects for a club it can show and play with (coach.team, match side.team)."""
@@ -1848,7 +1904,8 @@ def owned_team(raw):
     in18 = {str(s.get("id") or s["spid"]) for s in team["squad"]["positions"]}
     team["players"] = [{**({} if p.get("team2") and iid(p) not in in18 else {"state": "first"}), "grade": 0, "life": 100, "stamina": 1,
                         **{k: v for k, v in p.items() if k != "team2"}, "levelinfo": player_levelinfo(p),
-                        "_id": iid(p), "id": iid(p), "price": card_price(p["spid"], grade_of(p))}
+                        "_id": iid(p), "id": iid(p), "price": card_price(p["spid"], grade_of(p)),
+                        "condition": player_form(iid(p))}
                        for p in team["players"]]
     sq = dict(team["squad"])
     sq["positions"] = [dict(p, id=str(p.get("id") or p["spid"])) for p in sq["positions"]]
@@ -1949,12 +2006,15 @@ START_EP = 1000000
 #   dynamic   the Market moves (market_value): a card's price drifts day by day, managers list
 #             bargains and you may ask up to MARKET_ASK_MAX of the price, so buying low and selling
 #             high pays; off = a fixed Market where nothing is gained by trading back and forth
-# With a Shop that costs EP (SHOP_FREE off: EP is scarce) nothing turns EP into more EP: the Shop
-# sells at worth, rounded up (product_price; packs at their cards' dearest swing: pack_worth), an
-# Upgrade costs at least what it adds (enhance_cost; a restore costs EP), a Tukar v2 or Scout
-# offer is worth at most the cards given (trade_cap).
+# A Shop that costs EP (SHOP_FREE off) sells at worth, rounded up (product_price; packs at their
+# cards' dearest swing: pack_worth).
+#   strict    with a paid Shop, nothing turns EP into more EP (strict_economy, Sulit): an Upgrade costs
+#             at least what it adds (enhance_cost; a restore costs EP), a Tukar v2 or Scout offer is
+#             worth at most the cards given (trade_cap). Off (Santai, Realistis): the game's own
+#             rules, a 2% Upgrade fee, a restore for upgrade points, offers without a cap (user:
+#             "harga upgrade pemain terlalu mahal", "ikuti aturan game aslinya saja untuk Realistis")
 ECONOMY_FILE = os.path.join(HERE, "gamedata", "economy.json")
-ECONOMY_DEFAULT = {"players": 1.0, "packs": 1.0, "start_ep": START_EP, "dynamic": False}
+ECONOMY_DEFAULT = {"players": 1.0, "packs": 1.0, "start_ep": START_EP, "dynamic": False, "strict": False}
 
 
 def economy_clean(cfg):
@@ -1967,9 +2027,15 @@ def economy_clean(cfg):
     v = cfg.get("start_ep")
     if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10 ** 12:
         out["start_ep"] = v
-    if isinstance(cfg.get("dynamic"), bool):
-        out["dynamic"] = cfg["dynamic"]
+    for k in ("dynamic", "strict"):
+        if isinstance(cfg.get(k), bool):
+            out[k] = cfg[k]
     return out
+
+
+def strict_economy():
+    """The strict rules (ECONOMY_DEFAULT): on and a Shop that costs EP."""
+    return ECONOMY["strict"] and not SHOP_FREE
 
 
 def load_economy():
@@ -2474,10 +2540,42 @@ def ep_l2_achievement(query, body):
 # ({teamid, summary, team}, built by gen_teams.team like the six recommended clubs).
 CLUB_MIN_PLAYERS = 16  # licensed 2017 cards a club needs to be listed
 REST_OF_WORLD = 999998  # FO3's team for players of unlicensed clubs (26 LIVE has 91 such cards): not a club
-_CLUBS = []
+_CLUBS, _CLUBS_KIT = [], []
+
+
+@functools.lru_cache(maxsize=1)
+def kit_teams():
+    """The teamids with a kit in the client (data/sceneassets/kit/kit_<id>_*.rx3 in its data_*.big),
+    or None when the client cannot be read. A match against a club without one crashed the game
+    before it loaded (user: Ansan Greeners; six K League Challenge clubs have none)."""
+    try:
+        if os.path.join(HERE, "tools", "re") not in sys.path:
+            sys.path.insert(0, os.path.join(HERE, "tools", "re"))
+        import bigdir
+        kits = {int(m.group(1)) for big in glob.glob(os.path.join(GAME, "data", "data_*.big"))
+                for n, *_ in bigdir.entries(big) if (m := re.match(r"data/sceneassets/kit/kit_(\d+)_", n))}
+    except Exception as e:
+        print(f"client kits: {e!r}", flush=True)
+        return None
+    return kits or None
+
+
+def has_kit(teamid):
+    kits = kit_teams()
+    return kits is None or int(teamid) in kits
 
 
 def club_index():
+    """all_clubs() without the clubs that have no kit in the client (has_kit): the club picker,
+    Liga, the vs COM picker. A league or nation left empty is left out."""
+    if not _CLUBS_KIT:
+        _CLUBS_KIT[:] = [(n, ls) for n, ls in ((n, [(lid, ts) for lid, ts in ((lid, [t for t in ts if has_kit(t)])
+                                                                             for lid, ts in leagues) if ts])
+                                               for n, leagues in all_clubs()) if ls]
+    return _CLUBS_KIT
+
+
+def all_clubs():
     """[(nationid, [(leagueid, [teamid])])] of clubs with a full 2017 squad, strongest first (by
     their best eleven); a league's nation is its players' most common nationality. National
     teams are league 78 with their players' nationalteamid as the squad (gen_teams.team)."""
@@ -2488,12 +2586,23 @@ def club_index():
                                  WHERE p.spid / 1000000 = ?1 OR (p.spid / 1000000 = ?2 AND p.playerid NOT IN
                                        (SELECT playerid FROM players WHERE spid / 1000000 = ?1))""",
                              (gen_teams.CURRENT_SEASON, gen_teams.LEGACY_SEASON)).fetchall()
+            # classic (issue #43): the clubs FO3 ID never had count their FO3 cards of every year, one per
+            # player (gen_teams.team builds their squads the same way); FO3 has a few 2017 cards of theirs
+            open_ = gen_teams.open_clubs() if gen_teams.CURRENT_SEASON == gen_teams.LEGACY_SEASON else []
+            own = c.execute(f"""SELECT p.playerid, p.leagueid, p.teamid, {POSOVR} FROM players p
+                                WHERE p.teamid IN ({",".join(map(str, open_)) or "-1"}) AND p.spid >= 1000000
+                                AND p.spid / 1000000 NOT IN ({",".join(map(str, ADDED_SEASONS))})""").fetchall()
         squads, nats = {}, {}
         for spid, lid, tid, ntid, nat, ovr in rows:
             squads.setdefault((lid, tid), {})[spid] = ovr
             if ntid > 0:  # -1 / 0 = none
                 squads.setdefault((gen_teams.NATIONAL_LEAGUE, ntid), {})[spid] = ovr
             nats.setdefault(lid, collections.Counter())[nat] += 1
+        for k in [k for k in squads if k[1] in open_]:
+            del squads[k]
+        for pid, lid, tid, ovr in own:
+            sq = squads.setdefault((lid, tid), {})
+            sq[-pid] = max(sq.get(-pid, 0), ovr)
         power = {k: sum(sorted(v.values())[-11:]) / 11 for k, v in squads.items()
                  if len(v) >= CLUB_MIN_PLAYERS and k[1] != REST_OF_WORLD}
         leagues = {}
@@ -2961,10 +3070,13 @@ def ep_match_player_ready(mid, query, body):
 
 
 def match_cards(st, stats):
-    """[(my card, its matchStats player)] for my side's players. In-match spid = the card's
-    player id (spid % 1e6); a card in the squad wins over another card of the same player."""
+    """[(my card, its matchStats player)] for my side's players: the starters (players) and the subs
+    who came on (substitutes, role 28; issue #44: they got no exp), not the unused bench (reserved).
+    In-match spid = the card's player id (spid % 1e6); a card in the squad wins over another card of
+    the same player."""
     team, done, out = st["teams"].get(str(_default_slot(st))) or {"players": []}, set(), []
-    for s in (stats.get(stats.get("myTeam", "home")) or {}).get("players") or []:
+    side = stats.get(stats.get("myTeam", "home")) or {}
+    for s in (side.get("players") or []) + (side.get("substitutes") or []):
         pid = int(s.get("spid") or 0) % 1000000
         mine = [p for p in team["players"] if int(p["spid"]) % 1000000 == pid and iid(p) not in done]
         p = next((p for p in mine if in_squad(team, p)), mine[0] if mine else None)
@@ -2986,7 +3098,8 @@ MATCH_REWARD_DEFAULT = {
     "result": {"win": {"ep": 2000, "coach": 300, "player": 150}, "draw": {"ep": 1000, "coach": 200, "player": 100},
                "loss": {"ep": 500, "coach": 100, "player": 60}},
     "cards": [[30, {"ep": 1000}], [25, {"ep": 3000}], [15, {"ep": 5000}], [8, {"ep": 10000}],
-              [10, 92000000], [7, 92000014], [5, 501]]}  # Semua Pemain, '14 Top 200, Lucky EP
+              [10, 92000000], [7, 92000014], [5, 501],  # Semua Pemain, '14 Top 200, Lucky EP
+              [8, 970_000_001]]}  # Kotak player piece (CRAFT_BOX, Kontrak pemain)
 
 
 def match_reward_cfg():
@@ -3935,13 +4048,13 @@ def enhance_rate(target, material):
 
 
 def enhance_cost(target, material, rate):
-    """EP for one try: 2% of the target's value (at least 1,000). When EP is scarce (a Shop that
-    costs EP: the Realistis and Sulit economies) at least what the try adds to the card's Market
-    value on average at its odds (rate, boosts included): else the +1..+3 stock, which never runs
-    out, made EP (a +3 tried with a cheap +1 at 74% doubled its money; free boosts did more)."""
+    """EP for one try: 2% of the target's value (at least 1,000). With the strict rules (Sulit) at
+    least what the try adds to the card's Market value on average at its odds (rate, boosts
+    included): else the +1..+3 stock, which never runs out, makes EP (a +3 tried with a cheap +1 at
+    74% doubled its money; free boosts did more), as in the game itself."""
     g = grade_of(target)
     base = max(1000, sig3(card_price(target["spid"], g) // 50))
-    if SHOP_FREE:
+    if not strict_economy():
         return base
     v = lambda x: market_value(target["spid"], x)  # the material is the same player
     fail = g - 1 if g >= ENHANCE_DROP_FROM else g
@@ -4119,7 +4232,7 @@ def ep_enhance25(a, b, use_point, itemid, event, query, body):
     st.pop("enhance_restore", None)
     usepoint = {"currency": "ES", "price": ES_RESTORE * need}
     if grade_of(pa) < before:
-        if not SHOP_FREE:
+        if strict_economy():  # the game's own: upgrade points
             usepoint = {"currency": "EP", "price": nice_ceil(market_value(pa["spid"], before) - market_value(pa["spid"], grade_of(pa)))}
         st["enhance_restore"] = {"id": iid(pa), "grade": before, **usepoint}
     _save(st)
@@ -4325,10 +4438,10 @@ def trade3_pool():
 
 
 def trade_cap(give):
-    """When EP is scarce (a Shop that costs EP), the most a Tukar v2 or Scout offer may be worth,
-    (value, Market value): the given cards' own. Their bonuses and ranges gave back up to about
-    twice, and the best of the offers could be asked again without end. None = no cap."""
-    if SHOP_FREE:
+    """With the strict rules (Sulit), the most a Tukar v2 or Scout offer may be worth, (value,
+    Market value): the given cards' own. Their bonuses and ranges gave back up to about twice, and
+    the best of the offers could be asked again without end. None = no cap (the game's own)."""
+    if not strict_economy():
         return None
     return (sum(card_price(p["spid"], grade_of(p)) for p in give), sum(market_value(p["spid"], grade_of(p)) for p in give))
 
@@ -4492,6 +4605,148 @@ def ep_player_move(pid, where, query, body):
         p.pop("team2", None)
     _save(st)
     return _json({"result": True, "resources": coach_me_resources(st, slot)})
+
+
+def ep_player_release(pid, query, body):
+    """DELETE /player/<_id> (Skuad > Lepas, PlayerPoolItemListRenderer.onOkDeletePlayer; issue #44: the
+    player stayed): the card is gone for good, no EP back. The client says "{0} telah dilepas" on any
+    result true; the list drops the card through the reply's resources. A starter, or a card of a club
+    down to 18 players (11 + 7 subs), stays (COMMON_PLAYER_INFO_REMOVE_NOTALLOWED)."""
+    try:
+        method = (json.loads(body or b"{}").get("_method") or REQUEST["method"]).upper()
+    except (ValueError, AttributeError):
+        method = REQUEST["method"]
+    if method != "DELETE":  # what the path got before
+        return (ep_empty if method == "GET" else ep_telemetry)(query, body)
+    st = _state(); slot = _default_slot(st); team = st["teams"][str(slot)]
+    p = next((x for x in team["players"] if iid(x) == pid), None)
+    if p is None:
+        return _json({"result": False, "reason": "not exists player"})  # the client shows NO_SUCH_OFFER
+    if is_starter(team, p) or len(team["players"]) <= 18:
+        return _json({"result": False, "reason": "COMMON_PLAYER_INFO_REMOVE_NOTALLOWED"})
+    remove_player(team, p)
+    _save(st)
+    return _json({"result": True, "resources": coach_me_resources(st, slot)})
+
+
+# --------------------------------------------------------------------------- #
+# Kontrak pemain (Tim > Manajemen pemain > Kontrak pemain, FO3's craft; issue #44: the tab was empty).
+# TeamManagementPlayerCraftTabPage lists GET /mixin/recipes {recipeid: recipe}, category "player"
+# only: {recipeid, category, materials [MATERIAL_PLAYER 0: {itemid, count} (the player's pieces),
+# MATERIAL_CONTRACT 1: {itemid, count}], result.normal {id: spid, grade, price}, money.ep (the fee)};
+# what I have comes from my items (CoachProxy.items, by itemid). "Kontrak" posts /mixin/<recipeid>
+# {materials: [{type "item", id: stack _id, count}]} and on {result: true, results: [{spid, grade}]}
+# shows the signed card (TeamManagementPlayerCraftPopupScreen). The super material (features
+# ...craft.material, materials[0].replace) is off. A piece is an item of type ITEM_PLAYER_CRAFT with
+# staticdata spid / enhance: Item saya leaves those out (CoachProxy.getShowItemInInventory).
+# Recipes (gamedata/craft.json, the admin page's Shop tab; issue #44: "Can we change the player list in
+# craft system?"): its players [spid] (one card a player, the first), or none = the `count` best Legend
+# players (TC_LEGENDS seasons, one card each, on the Market); each at +`grade` for `pieces` of his pieces,
+# one contract and `fee` of the card's price. Pieces come from the "Kotak player piece" item (CRAFT_BOX:
+# 1-3 pieces of a random recipe; Shop, match reward cards, daily rewards, the Bag...), the contract from
+# the Shop. A player taken off the list keeps his pieces (they count again if he comes back).
+# --------------------------------------------------------------------------- #
+CRAFT_CONTRACT, CRAFT_BOX = 970_000_000, 970_000_001  # icons: a signed sheet, a crate of balls
+CRAFT_PIECE = 971_000_000  # + player id: that player's pieces
+CRAFT_FILE = os.path.join(HERE, "gamedata", "craft.json")
+CRAFT_DEFAULT = {"players": [], "count": 30, "pieces": 10, "fee": 0.05, "grade": 1}
+CRAFT_BOX_EP = 5_000_000  # a paid Shop's box price at player prices x1
+
+
+def is_piece(itemid):
+    return CRAFT_PIECE < int(itemid) < CRAFT_PIECE + 1_000_000
+
+
+def craft_cfg():
+    """CRAFT_DEFAULT with gamedata/craft.json's settings (read at every use: a change counts from the
+    next request, the client's list from the next login)."""
+    try:
+        with open(CRAFT_FILE, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        cfg = {}
+    return {**CRAFT_DEFAULT, **{k: v for k, v in (cfg if isinstance(cfg, dict) else {}).items() if k in CRAFT_DEFAULT}}
+
+
+def craft_cards():
+    """[(spid, player id, short name)] of the recipes, in the list's order (the default list: best first)."""
+    cfg = craft_cfg()
+    return _craft_cards(tuple(int(s) for s in cfg["players"]), int(cfg["count"]))
+
+
+@functools.lru_cache(maxsize=8)
+def _craft_cards(players, count):
+    with closing(_db()) as c:
+        if players:
+            q = "SELECT p.spid, p.playerid, n.short FROM players p JOIN namesind n ON n.playerid = p.playerid WHERE p.spid = ?"
+            rows = [r for r in (c.execute(q, (s,)).fetchone() for s in players) if r]
+        else:
+            rows = c.execute(f"""SELECT p.spid, p.playerid, n.short FROM players p JOIN namesind n ON n.playerid = p.playerid
+                                 WHERE p.spid / 1000000 IN ({_in(TC_LEGENDS)}) ORDER BY {POSOVR} DESC, p.spid""").fetchall()
+    market, seen, out = market_spids(), set(), []
+    for spid, pid, name in rows:
+        if (players or spid in market) and pid not in seen:
+            seen.add(pid)
+            out.append((spid, pid, name))
+    return out if players else out[:count]
+
+
+def craft_recipes():
+    """GET /mixin/recipes: {recipeid (the player id): recipe}."""
+    cfg, out = craft_cfg(), {}
+    for spid, pid, _ in craft_cards():
+        price = card_price(spid, cfg["grade"])
+        out[str(pid)] = {"recipeid": pid, "category": "player",
+                         "materials": [{"itemid": CRAFT_PIECE + pid, "count": cfg["pieces"]}, {"itemid": CRAFT_CONTRACT, "count": 1}],
+                         "result": {"normal": {"id": spid, "grade": cfg["grade"], "price": price}},
+                         "money": {"ep": sig3(price * cfg["fee"])}}
+    return out
+
+
+def piece_def(itemid):
+    """A piece's staticdata: the card of its recipe (else the player's best card), which a reward card
+    draws with a puzzle (RewardCardFront.setPuzzleData: spid, enhance)."""
+    pid = int(itemid) - CRAFT_PIECE
+    spid, name = next(((s, n) for s, p, n in craft_cards() if p == pid), (None, None))
+    if spid is None:
+        with closing(_db()) as c:
+            r = c.execute(f"SELECT p.spid FROM players p WHERE p.playerid = ? AND p.spid >= 1000000 ORDER BY {POSOVR} DESC",
+                          (pid,)).fetchone()
+        spid = r[0] if r else pid
+        name = card_name(spid)
+    cfg = craft_cfg()
+    return {"itemid": int(itemid), "productid": int(itemid), "name": f"Player piece {name}", "category": "USE",
+            "type": "ITEM_PLAYER_CRAFT", "unit": "COUNT", "itemicon": ITEMS[CRAFT_BOX][1], "stackable": True,
+            "spid": spid, "enhance": cfg["grade"],
+            "description": f"Kumpulkan {cfg['pieces']} untuk mengontrak {name} (Tim > Manajemen pemain > Kontrak pemain)."}
+
+
+def ep_mixin(rid, query, body):
+    """POST /mixin/<recipeid>: sign the recipe's card for my pieces of him, a contract and the fee (the
+    stacks counted are mine, whichever ids the request names) -> {result, results [{spid, grade}]} and
+    /coach/me (items, EP, players) for the list's counts."""
+    st = _state(); slot = _default_slot(st); coach = my_coach(st); team = st["teams"][str(slot)]
+    r = craft_recipes().get(str(rid))
+    if r is None:
+        return _json({"result": False, "reason": "CRAFTSYSTEM_ERROR_03"})
+    need = {m["itemid"]: m["count"] for m in r["materials"]}
+    have = {i["itemid"]: i for i in coach.get("items", []) if i["itemid"] in need}
+    if len(team["players"]) >= MAX_PLAYERS:
+        return _json({"result": False, "reason": "CRAFTSYSTEM_ERROR_01"})
+    if any(have.get(i, {}).get("remains", 0) < n for i, n in need.items()):
+        return _json({"result": False, "reason": "CRAFTSYSTEM_ERROR_02"})
+    if coach.get("ep", START_EP) < r["money"]["ep"]:
+        return _json({"result": False, "reason": "CRAFTSYSTEM_ERROR_05"})
+    for i, n in need.items():
+        have[i]["remains"] -= n
+        if not have[i]["remains"]:
+            coach["items"].remove(have[i])
+    add_ep(st, -r["money"]["ep"])
+    card = r["result"]["normal"]
+    add_player(team, card["id"], card["grade"])
+    _save(st)
+    return _json({"result": True, "results": [{"spid": card["id"], "grade": card["grade"]}],
+                  "resources": coach_me_resources(st, slot)})
 
 
 def ep_trade3_info(query, body):
@@ -4863,6 +5118,8 @@ def item_def(itemid):
         return use_item_def(itemid)
     if itemid in PACKAGES or itemid in MONTHLY:
         return package_def(itemid)
+    if is_piece(itemid):
+        return piece_def(itemid)
     name, f = PACKS[itemid]
     d = {"itemid": itemid, "productid": itemid, "name": name, "category": "PLAYERPACK",
          "type": "LEAGUE" if "league" in f else "POSITION" if "pos" in f else "CUSTOM",
@@ -4934,6 +5191,12 @@ ITEMS = {  # itemid: (name, icon, type, effect, description)
     # Player Growth's Reset button (any item of this type; icon drawn for this server)
     3003: ("Reset poin taktik", 9900200, "PLAYER_GROWTH_RESET", {},
            "Perkembangan pemain: kembalikan semua poin taktik yang dipakai satu pemain."),
+    # Kontrak pemain (issue #44): the contract it takes, and a box of pieces (its "Gunakan" opens it
+    # as any random box; pieces: how many of one recipe's player)
+    CRAFT_CONTRACT: ("Kontrak pemain", 119110705, "ITEM_USE_CRAFT", {},
+                     "Dipakai di Tim > Manajemen pemain > Kontrak pemain, bersama player piece dan EP."),
+    CRAFT_BOX: ("Kotak player piece", 120013101, "ITEM_LOTTERY", {"pieces": (1, 3)},
+                "Isi 1-3 player piece dari satu pemain legenda (untuk Kontrak pemain)."),
     # Upgrade 2.5 boost items (EnhanceControlPanel lists type ENHANCEMENT_BOOST; names from the
     # client's ENHANCEMENT_BOOST<id>; the cache has no icons of their own, 1000002 = green arrows)
     1000052: ("Enhancement Boost Gold", 1000002, "ENHANCEMENT_BOOST", {"boost": 0.15}, "Upgrade: peluang sukses +15%."),
@@ -5016,6 +5279,8 @@ def use_item_def(itemid, prizes=True):
             # none crashed every box at "Gunakan" (issue #12). A box among the prizes shows no prizes
             # of its own (no loop).
             **({"availables": [prize_item(p) for _, p in eff["prizes"]]} if prizes and "prizes" in eff else {}),
+            **({"availables": [{"itemid": CRAFT_PIECE + pid, "count": 1, "staticdata": piece_def(CRAFT_PIECE + pid)}
+                               for _, pid, _ in craft_cards()]} if prizes and "pieces" in eff else {}),
             "bunches": [{"bunch": n, "price": product_price(itemid, n)} for n in PACK_BUNCHES]}
 
 
@@ -5143,6 +5408,7 @@ def pack_to(entry):
 def item_from(v):
     t = v["type"]
     eff = ({"ep": tuple(int(x) for x in v["ep"])} if t == "EP_LOTTERY"
+           else {"pieces": tuple(int(x) for x in v["pieces"])} if t == "ITEM_LOTTERY" and v.get("pieces")  # CRAFT_BOX
            else {"prizes": [(int(w), ("ep", int(p["ep"])) if isinstance(p, dict) else int(p)) for w, p in v["prizes"]]}
            if t == "ITEM_LOTTERY" else {"boost": float(v["boost"])} if t == "ENHANCEMENT_BOOST"
            else {k: int(v[k]) for k in ("exp", "lv", "season") if v.get(k)} if t == "PLAYER_EXP_CAPSULE" else {})
@@ -5154,6 +5420,7 @@ def item_to(entry):
     return {"name": name, "icon": icon, "type": t, "description": desc,
             **({"ep": list(eff["ep"])} if "ep" in eff else {}), **({"boost": eff["boost"]} if "boost" in eff else {}),
             **{k: eff[k] for k in ("exp", "lv", "season") if k in eff},
+            **({"pieces": list(eff["pieces"])} if "pieces" in eff else {}),
             **({"prizes": [[w, {"ep": p[1]} if isinstance(p, tuple) else p] for w, p in eff["prizes"]]}
                if "prizes" in eff else {})}
 
@@ -5226,7 +5493,7 @@ def product_price(itemid, n):
 # "Gunakan poin" takes at +9 for the same chance (Silver +10% = 100 points).
 ES_EP = 1000  # an upgrade point
 EXP_EP = 10  # a point of a player's EXP (LV.1 -> LV.23 takes 25,300)
-CHANGE_EP = {"COACHNAME_CHANGE": 100_000, "TEAM_CHANGE": 300_000, "PLAYER_GROWTH_RESET": 200_000}
+CHANGE_EP = {"COACHNAME_CHANGE": 100_000, "TEAM_CHANGE": 300_000, "PLAYER_GROWTH_RESET": 200_000, "ITEM_USE_CRAFT": 1_000_000}
 
 
 def shop_worth(itemid, depth=0):
@@ -5253,6 +5520,8 @@ def shop_worth(itemid, depth=0):
             return eff["exp"] * EXP_EP * ECONOMY["players"]
         if typ in CHANGE_EP:
             return CHANGE_EP[typ] * ECONOMY["players"]
+        if "pieces" in eff:
+            return CRAFT_BOX_EP * ECONOMY["players"]
         if typ == "LEAGUE_SIMULATION":  # a won match, its reward card, its share of the season's prizes
             cfg = match_reward_cfg()
             cards = [(w, p["ep"] if isinstance(p, dict) else worth(p)) for w, p in cfg["cards"]
@@ -5332,7 +5601,8 @@ def coach_items(st, slot, where="items"):
     coach = next(c for c in st["coaches"] if c["slot"] == slot)
     return [{"_id": i["_id"], "id": i["_id"], "itemid": i["itemid"], "remains": i["remains"], "count": i["remains"],
              "expireable": True, "expired": False, "staticdata": item_def(i["itemid"])}
-            for i in coach.get(where, []) if i["itemid"] in PACKS or i["itemid"] in ITEMS] + [LR_TICKET_ITEM] * (where == "items")
+            for i in coach.get(where, []) if i["itemid"] in PACKS or i["itemid"] in ITEMS or is_piece(i["itemid"])] \
+        + [LR_TICKET_ITEM] * (where == "items")
 
 
 def ep_shop_purchase(query, body):
@@ -5379,13 +5649,19 @@ def ep_shop_purchase(query, body):
 def use_item(st, slot, coach, it, req):
     """/item/<_id>/use for a USE item (see ITEMS): its effect, one used up."""
     _, _, typ, eff, _ = ITEMS[it["itemid"]]
-    if typ in ("ENHANCEMENT_BOOST", "LEAGUE_SIMULATION"):  # spent by the Upgrade tab / Liga's Simulasi, not by "Gunakan"
+    if typ in ("ENHANCEMENT_BOOST", "LEAGUE_SIMULATION", "ITEM_USE_CRAFT"):  # spent by Upgrade / Simulasi / Kontrak pemain
         return {"result": False, "reason": "ITEM_USE_ERROR"}
     out = {"result": True}
     if typ == "EP_LOTTERY":  # lower amounts more likely
         lo, hi = eff["ep"]
         out["ep"] = lo if lo == hi else max(lo, round(random.triangular(lo, hi, lo), -4))
         add_ep(st, out["ep"])
+    elif typ == "ITEM_LOTTERY" and "pieces" in eff:  # Kotak player piece: pieces of one recipe's player
+        if not craft_cards():
+            return {"result": False, "reason": "ITEM_USE_ERROR"}
+        piece, n = CRAFT_PIECE + random.choice(craft_cards())[1], random.randint(*eff["pieces"])
+        inventory_add(coach, piece, n)
+        out["item"] = {"itemid": piece, "count": n, "staticdata": piece_def(piece)}
     elif typ == "ITEM_LOTTERY":
         prize = random.choices([p for _, p in eff["prizes"]], [w for w, _ in eff["prizes"]])[0]
         if isinstance(prize, tuple):
@@ -5490,7 +5766,8 @@ def ep_static_item(query, body):
             ids.append(int(i))
         except (TypeError, ValueError):
             pass
-    return _json({str(i): item_def(i) for i in ids if i in (EP_ITEM, ES_ITEM) or i in PACKS or i in ITEMS or i in PACKAGES})
+    return _json({str(i): item_def(i) for i in ids if i in (EP_ITEM, ES_ITEM) or i in PACKS or i in ITEMS or i in PACKAGES
+                  or is_piece(i)})
 
 
 # --------------------------------------------------------------------------- #
@@ -6597,7 +6874,7 @@ def ep_itemnames(query, body):
     """GET /static/db/ITEMNAMES {itemid: {<language>: name}}: the reward panels' (and Upgrade's) item
     names. The client reads name[Localization.LOCALE] (= ep_locale's language), so every language
     code gets one (issue #36: the Vietnamese pack's "vie" showed "undefined" and a UI error)."""
-    ids = [EP_ITEM, ES_ITEM, *PACKS, *ITEMS, *PACKAGES, *MONTHLY]
+    ids = [EP_ITEM, ES_ITEM, *PACKS, *ITEMS, *PACKAGES, *MONTHLY, *(CRAFT_PIECE + pid for _, pid, _ in craft_cards())]
     return _json({str(i): dict.fromkeys(("kor", "eng", "chi", "vie", "tha", "ind", "jpn"), item_def(i)["name"]) for i in ids})
 
 
@@ -6624,6 +6901,8 @@ def gp_shop_list():
     for itemid, gp in gp_shop_prices().items():
         e = shop_entry(itemid, "GPSHOP", GP_SHOPID + itemid)
         e["product"]["staticdata"]["bunches"] = [{"bunch": 1, "price": gp}]
+        # the reward box's picture; bundleicon is read only there and by the Shop's tiles (TileList)
+        e["product"]["staticdata"]["bundleicon"] = f"{QUEST_ICON}{e['product']['staticdata']['bundleicon']}"
         out.append(e)
     return out
 
@@ -6875,9 +7154,9 @@ def vm_play(vm, sid, d, first, joined=None, hour=None):
 def vm_thirds():
     """Clubs by strength for a manager's club: a beginner gets one from the bottom third of a
     league, intermediate the middle, advanced the top (club_index lists each league's clubs
-    strongest first)."""
+    strongest first). all_clubs, so that a club without a kit only moves its own managers (vm_make)."""
     thirds = ([], [], [])
-    for _, leagues in club_index():
+    for _, leagues in all_clubs():
         for lid, teams in leagues:
             if lid != gen_teams.NATIONAL_LEAGUE:
                 for k, t in enumerate(teams):
@@ -6889,14 +7168,16 @@ def vm_make(rnd, n, name, tier, played=True):
     """Manager n (id vm<n>) of tier `tier` (VM_TIERS), drawn from rnd. played: this season's
     record so far (the first crowd's), else none (a newcomer)."""
     _, grades, levels, ratings = VM_TIERS[tier]
-    thirds = vm_thirds()
+    pool = vm_thirds()[tier] or vm_thirds()[0]
+    # a club without a kit: the next one of its third that has one (no extra draw: the rest stays)
+    kit = lambda t: next((c for c in pool[pool.index(t):] + pool if has_kit(c)), t)
     base = rnd.randint(*ratings)
     elo = [max(1000, base + rnd.randint(-40, 40)) for _ in range(LADDER_COUNT)]
     games = [rnd.randint(10, 60) * (tier + 1) if played else 0 for _ in range(LADDER_COUNT)]
     wins = [round(g * min(0.8, 0.35 + (e - 1000) / 2000)) for g, e in zip(games, elo)]
     forfeits = [rnd.randint(0, g // 25) for g in games]
     return {"_id": f"vm{n:04d}", "name": name, "level": rnd.randint(*levels),
-            "teamid": rnd.choice(thirds[tier] or thirds[0]), "grade": rnd.randint(*grades),
+            "teamid": kit(rnd.choice(pool)), "grade": rnd.randint(*grades),
             "elo": elo, "wins": wins, "forfeits": forfeits,
             "losses": [g - w - f for g, w, f in zip(games, wins, forfeits)]}
 
@@ -9566,6 +9847,8 @@ ROUTES = [
     (re.compile(r"/static/info/authentic/team/(licensed|all)/(\d+)"), ep_authentic_team),
     (re.compile(r"/static/info/team/summary/(\d+)"), ep_team_summary),
     (re.compile(r"/player/(\w+)/move/(firstteam|secondteam)"), ep_player_move),
+    (re.compile(r"/player/(\w+)"), ep_player_release),
+    (re.compile(r"/mixin/(\w+)"), ep_mixin),  # (/mixin/recipes: ENDPOINTS, matched first)
     (re.compile(r"/player/(\w+)/extra/growth"), ep_player_growth),
     (re.compile(r"/player/(\w+)/enhance/(\w+)/preview"), ep_enhance_preview),
     (re.compile(r"/player/(\w+)/enhance2\.5/(\w+)/preview/(\d)/(-?\d+)/(-?\d+)"), ep_enhance25_preview),
@@ -9662,6 +9945,7 @@ ENDPOINTS = {
 }
 ENDPOINTS["/contact/list"] = ep_contact_list
 ENDPOINTS["/stadium/list"] = ep_stadium_list  # before the /stadium/<id> route
+ENDPOINTS["/mixin/recipes"] = lambda q, b: _json(craft_recipes())  # Kontrak pemain's list (before /mixin/<id>)
 ENDPOINTS.update({"/ladder/reward": ep_ladder_reward, "/ladder/reward/info": lambda q, b: _json(ladder_rewards())})
 ENDPOINTS.update({"/ladder/leaderboard": ep_ladder_leaderboard, "/ladder/friends/info": ep_ladder_friends,
                   "/ladder/my/info": ep_ladder_my_info, "/ladder/season/info": ep_ladder_season_info,

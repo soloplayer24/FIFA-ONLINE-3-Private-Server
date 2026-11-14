@@ -9,6 +9,10 @@ certs/*.pem
 
 # Build output and caches
 launcher/*.exe
+dist/
+installer/build/
+installer/cache/
+installer/setup.log
 __pycache__/
 *.pyc
 .impeccable/

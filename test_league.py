@@ -4,7 +4,7 @@
 
 Runs a whole season through the handlers against a temporary copy of gamedata/state.json.
 """
-import calendar, copy, json, os, random, re, shutil, sys, tempfile, time
+import calendar, copy, json, os, random, re, shutil, struct, sys, tempfile, time, zlib
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +34,8 @@ def main():
         hc.ECONOMY_FILE = os.path.join(tmp, "economy.json"); hc.ECONOMY = dict(hc.ECONOMY_DEFAULT)  # not the live one
         hc.MATCH_REWARD_FILE = os.path.join(tmp, "match_rewards.json")  # default match rewards; admin test writes here
         hc.MISSIONS_FILE = os.path.join(tmp, "missions.json")  # default missions; admin test writes here
+        hc.CRAFT_FILE = os.path.join(tmp, "craft.json")  # the default Kontrak pemain list; admin test writes here
+        hc.VM_GEN_FILE = os.path.join(tmp, "vm_gen.json"); hc.vm_set_generation(0)  # the first crowd, not a regenerated one
         # a fresh account through the client's club creation (the live state may hold no manager)
         hc._save({"coaches": [], "defaultcoachid": "", "teams": {}})
         # issue #42: the boot asks King of the Hill's registrations before any manager exists (the
@@ -192,6 +194,20 @@ def main():
         msn = named[20002]
         assert [(g["count_min"], g["count_max"]) for g in msn["boostgroups"]] == [(3, 11)]
         assert all(c["teamcolorid"] < 70000 and c["teamcolorid"] not in (20055, 20056, 20057, 20058) for c in tc["teamColors"])
+        # issue #44: 20028 / 20029 ("Red Day Boost", the Thai pack's "Red Devil") are Manchester United's
+        # cards, not every '17 card and every card: a Barcelona XI has neither
+        assert not {20028, 20029} & {c["teamcolorid"] for c in active}, active
+        with hc.closing(hc._db()) as c:
+            mu = {r[0] for r in c.execute(f"SELECT spid FROM players p WHERE {hc._CLUB(11)}")}
+            every = c.execute("SELECT COUNT(*) FROM players").fetchone()[0]
+        reds = hc.tc_special_sets()[20029][0]
+        assert reds and reds <= mu and len(reds) < every / 10 and hc.tc_special_sets()[20028][0] <= reds
+        # form arrows (issue #44): every card has a condition the squad list draws, the same all day
+        cond = [p["condition"] for p in hc.coach_me(st, 0)["team"]["players"]]
+        assert set(cond) <= {f for f, _ in hc.FORMS} and len(set(cond)) > 1
+        assert cond == [p["condition"] for p in hc.coach_me(st, 0)["team"]["players"]]
+        assert {hc.player_form(f"c{i}", "2026-11-11") for i in range(200)} == {f for f, _ in hc.FORMS}
+        assert [hc.player_form(f"c{i}", "2026-11-11") for i in range(50)] != [hc.player_form(f"c{i}", "2026-11-12") for i in range(50)]
         assert hc.match_side(st["teams"]["0"], 241, user={"id": "me"})["team"]["teamcolors"] == active
         assert hc.match_side(st["teams"]["0"], 241)["team"]["teamcolors"] == []
         # a match side lists the 18 first: the HUD's season badge takes the first card of a player
@@ -436,6 +452,12 @@ def main():
         # initializeBestRecord reads a division's items[0] and [1] and walks wins until from > totalwins
         assert all(len(d["items"]) >= 2 for d in rewards["divs"])
         assert [w["from"] for w in rewards["wins"]] == sorted(w["from"] for w in rewards["wins"])
+        # a club without a kit in the client crashed the game before the match loaded (Ansan
+        # Greeners): no picker, Liga or virtual manager offers one
+        if hc.kit_teams():
+            assert not hc.has_kit(113595) and hc.has_kit(1476)
+            assert all(hc.has_kit(t) for _, ls in hc.club_index() for _, ts in ls for t in ts)
+            assert all(hc.has_kit(m["teamid"]) for m in hc.virtual_managers())
         # a Rank match: the PvP type, my user as the native session reads it, the opponent left
         # out of that session (nameless, unready) until the squad stage gives him back
         pushed = []  # ladder_found / ladder_squad push to the game over messenger.py: never to a running one
@@ -1553,9 +1575,9 @@ def main():
         hc.my_coach(st).pop("growth"); card["levelinfo"] = kept_lv
         st["teams"][slot]["players"][0]["levelinfo"] = kept_lv or {"level": 1, "exp": 0}; hc._save(st)
         vms = sorted(hc.virtual_managers(), key=lambda m: max(m["elo"]))  # the crowd grows its cards too
-        assert not any(p.get("sp") for p in hc.vm_team(vms[0]["_id"])["players"])
-        assert all(0 < p["sp"]["used"] <= 60 for p in hc.vm_team(vms[-1]["_id"])["players"] if p.get("sp"))
-        assert any(p.get("sp") for p in hc.vm_team(vms[-1]["_id"])["players"])
+        used = lambda m: [p["sp"]["used"] for p in hc.vm_team(m["_id"])["players"] if p.get("sp")]
+        # by rating (the weakest is no longer at LADDER_START once the crowd's ratings have moved for days)
+        assert sum(used(vms[0])) < sum(used(vms[-1])) and all(0 < u <= 60 for u in used(vms[-1]))
         # --- shop: player packs for EP (1 or 10); Item saya opens one card per use
         shop = body(hc.ENDPOINTS["/shop/list"]("", b""))
         cats = Counter(e["shopcategory"] for e in shop)
@@ -2227,6 +2249,13 @@ def main():
             with hc.closing(hc._db()) as c:
                 madrid = gen_teams.team(c, 243)
             assert {int(p["spid"]) // 1000000 for p in madrid["team"]["players"]} == {gen_teams.LEGACY_SEASON}
+            # issue #43: a club FO3 ID never had (AC Milan) plays FO3's cards of every year in classic, none
+            # added, and is listed when they make a squad
+            with hc.closing(hc._db()) as c:
+                milan = gen_teams.team(c, 47)
+            hc._CLUBS.clear(); hc._CLUBS_KIT.clear()
+            assert bool(milan) == (47 in {t for _, ls in hc.all_clubs() for _, ts in ls for t in ts})
+            assert not milan or not {int(p["spid"]) // 1000000 for p in milan["team"]["players"]} & hc.ADDED_SEASONS
             A("world_set", world="modern")
             gen_teams.WORLD = gen_teams.world()
             modern = {c.spid // 1000000 for cs in hc.vm_card_pool.__wrapped__().values() for c in cs}
@@ -2236,6 +2265,7 @@ def main():
             assert got[:len(base)] == base and {v for e in got[len(base):] for v in e["value"]} <= set(hc.card_seasons())  # no own season here
         finally:
             gen_teams.WORLD_FILE, gen_teams.CURRENT_SEASON, gen_teams.WORLD = kept_world, kept_season, kept_running
+            hc._CLUBS.clear(); hc._CLUBS_KIT.clear()  # the club lists of the running world again
         # King of the Hill's region set (issue #36): Indonesia, Singapore / Malaysia, Thailand, Vietnam
         kept_koth = (hc.KOTH_FILE, hc.KOTH_CUSTOM_FILE)
         hc.KOTH_FILE, hc.KOTH_CUSTOM_FILE = os.path.join(tmp, "koth_admin.json"), os.path.join(tmp, "koth_custom.json")
@@ -2329,6 +2359,28 @@ def main():
         assert hc.coach_me(hc._state(), 0)["gpdata"]["point"] == sum(b["reward"]["count"] for q, b in zip(quests, bank["current"]) if "completedat" in q)
         shop = body(hc.ENDPOINTS["/shop/list/GPSHOP"]("", b""))  # its reward boxes, priced in GP
         assert [(e["product"]["itemid"], e["product"]["staticdata"]["bunches"][0]["price"]) for e in shop] == list(hc.GP_SHOP)
+        # issue #44: a reward box stretches its picture to 170 x 140 on screen, so its icon is the Shop's
+        # 170 x 120 one with transparent rows above and below; the image rows stay byte for byte
+        assert all(str(e["product"]["staticdata"]["bundleicon"]).startswith(hc.QUEST_ICON) for e in shop)
+
+        def rgba_png(w, h, raw, ctype=6):
+            chunk = lambda k, c: struct.pack(">I", len(c)) + k + c + struct.pack(">I", zlib.crc32(k + c))
+            return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, ctype, 0, 0, 0))
+                    + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+        rows = bytes([2]) + bytes(range(1, 17)) + bytes([0]) + bytes(range(17, 33))  # 4 x 2 RGBA, row 1 "Up" filtered
+        out = hc.pad_png(rgba_png(4, 2, rows), 1.0)
+        k = out.index(b"IDAT"); n = struct.unpack(">I", out[k - 4:k])[0]
+        assert struct.unpack(">II", out[16:24]) == (4, 4) and zlib.decompress(out[k + 4:k + 4 + n]) == bytes(17) + rows + bytes(17)
+        assert hc.pad_png(rgba_png(4, 2, rows[:13] + rows[17:30], ctype=2), 1.0) == rgba_png(4, 2, rows[:13] + rows[17:30], ctype=2)  # RGB: as it is
+        icon, real = os.path.join(tmp, "icon.png"), hc.asset_path
+        with open(icon, "wb") as f:
+            f.write(rgba_png(170, 120, bytes(681) * 120))
+        hc.asset_path = lambda rel: icon if rel == "externalAssets/shop/501.png" else real(rel)
+        try:
+            served = hc.cdn_file(f"externalAssets/shop/{hc.QUEST_ICON}501.png")
+        finally:
+            hc.asset_path = real
+        assert served[0] == "image/png" and struct.unpack(">II", served[1][16:24]) == (170, 140)
         st = hc._state(); hc.missions_state(st)["gp"] = 25; hc._save(st)
         buy_gp = lambda e: body(hc.ENDPOINTS["/shop/purchase"]("", json.dumps({"shopid": e["shopid"], "productid": e["product"]["itemid"], "bunch": 0}).encode()))
         assert buy_gp(shop[1])["resources"][0]["body"]["gpdata"]["point"] == 5 and buy_gp(shop[1])["reason"] == "NOT_ENOUGH_GP"
@@ -2435,7 +2487,7 @@ def main():
         assert refused("economy_set", players=0, packs=1, start_ep=0) and refused("economy_set", players=1, packs="x", start_ep=0)
         n_push = len(pushed)
         r = A("economy_set", players=2, packs=3, start_ep=5000, dynamic=False, shopfree=False)
-        assert r == dict(players=2.0, packs=3.0, start_ep=5000, dynamic=False, shopfree=False) and not hc.SHOP_FREE
+        assert r == dict(players=2.0, packs=3.0, start_ep=5000, dynamic=False, strict=False, shopfree=False) and not hc.SHOP_FREE
         # a running game keeps its Shop list for the whole session: the push makes it ask again, and
         # the game reads /shop/list/clear back and acts only on a new value (issue #30: a preset
         # chosen while the game ran left every price at 0)
@@ -2517,7 +2569,14 @@ def main():
         # turns EP into more EP. An Upgrade's fee takes what the try adds at its odds (boosts too), so
         # buying both cards and selling the result at the band's top never pays (a +3 tried with a +1
         # doubled its money); Easy keeps the 2% fee
+        # (with the strict rules, Sulit; Realistis keeps the game's own: a 2% fee, no offer cap. User:
+        # "harga upgrade pemain terlalu mahal", "ikuti aturan game aslinya saja untuk Realistis")
+        pa, pb = {"spid": 88158023, "grade": 1}, {"spid": 88158023, "grade": 1}
         A("economy_set", players=1, packs=1, start_ep=1000000, dynamic=True, shopfree=False)
+        base = max(1000, hc.sig3(hc.card_price(88158023, 1) // 50))
+        assert hc.enhance_cost(pa, pb, 1.0) == base and hc.trade_cap([pa]) is None and not hc.ECONOMY["strict"]
+        assert A("economy_set", players=1, packs=1, start_ep=1000000, dynamic=True, shopfree=False, strict=True)["strict"]
+        assert hc.enhance_cost(pa, pb, 1.0) > base and hc.trade_cap([pa])
         for s in sorted(hc.market_spids())[::2000][:25]:
             for tg in range(1, 10):
                 for mg in range(tg + 1):
@@ -2647,7 +2706,9 @@ def main():
             assert out == hc.LANG_FIXED and (fixed["COMMON_TIME_DAY"], fixed["COMMON_WEATHER_DUSK"]) == ("Siang", "Mendung")
             assert fixed["LIVEBOOST_CUSTOM_2900"] == "Team of the Week"  # Live Boost's one group
             keep = ("COMMON_TIME_DAY", "COMMON_WEATHER_DUSK", "LIVEBOOST_CUSTOM_2900")
-            assert {k: v for k, v in fixed.items() if k not in keep} == {k: v for k, v in orig.items() if k not in keep}
+            added = {k: v for k, v in hc.LANG_ADD.items() if k not in orig}  # LANG_ADD's keys the pack lacks (Kontrak pemain's notices)
+            assert {"CRAFTSYSTEM_NOTICE01", "CRAFTSYSTEM_NOTICE02"} <= set(added) and all(fixed[k] == v for k, v in added.items())
+            assert {k: v for k, v in fixed.items() if k not in keep and k not in added} == {k: v for k, v in orig.items() if k not in keep}
             assert hc.language_pack(src) == out and hc.cdn_file(hc.LANG_PACK)[1] == open(out, "rb").read()
             built = os.stat(out).st_mtime_ns
             assert hc.language_pack(src) == out and os.stat(out).st_mtime_ns == built  # built once
@@ -2658,8 +2719,9 @@ def main():
             # LANG_ADD's and then the Indonesian pack's fill the gaps
             tha = json.loads(hc.lang_missing('﻿{"STAFFPACK_NAME_11": "x"}'.encode()).decode("utf-8-sig"))
             assert tha["STAFFPACK_NAME_11"] == "x" and tha["STAFFPACK_NAME_12"] == hc.LANG_ADD["STAFFPACK_NAME_12"]
-            assert tha["COMMON_TIME_DAY"] == orig["COMMON_TIME_DAY"] and len(tha) == len(orig)
-            assert hc.lang_missing(hc.client_big(src, hc.LANG_ENTRY)) == hc.client_big(src, hc.LANG_ENTRY)  # nothing missing
+            assert tha["COMMON_TIME_DAY"] == orig["COMMON_TIME_DAY"] and len(tha) == len(orig) + len(added)
+            ind = json.loads(hc.lang_missing(hc.client_big(src, hc.LANG_ENTRY)).decode("utf-8-sig"))
+            assert ind == {**orig, **added}  # the Indonesian pack itself gains only LANG_ADD's missing keys
             junk = os.path.join(tmp, "junk.big")
             with open(junk, "wb") as f:
                 f.write(b"<html>404</html>")  # a damaged pack: served as it is, never no reply
@@ -2714,6 +2776,17 @@ def main():
         assert {c["itemid"] for c in rw["extra"]["availables"]} <= {hc.EP_ITEM, pid}
         mine = rw["extra"]["availables"][0]  # the opened card is credited
         assert (ep(), items()[0]["remains"]) == ((ep1 + 777, n1) if mine["itemid"] == hc.EP_ITEM else (ep1, n1 + 1))
+        # issue #44: a sub who came on (matchStats substitutes, role 28) gets exp too; the unused bench
+        # (reserved) does not
+        st = hc._state(); pos = st["teams"][str(hc._default_slot(st))]["squad"]["positions"]
+        xi, subs = [s for s in pos if s["pos"] < hc.POS_SUB][:1], [s for s in pos if s["pos"] == hc.POS_SUB][:2]
+        card = lambda s: str(s.get("id") or s["spid"])
+        stats = {"myTeam": "home", "opponentTeam": "away", "away": {"score": 0},
+                 "home": {"score": 0, "players": [{"spid": int(xi[0]["spid"]) % 1000000}],
+                          "substitutes": [{"spid": int(subs[0]["spid"]) % 1000000, "role": 28}],
+                          "reserved": [{"id": card(subs[1]), "rating": 0}]}}
+        got = [p["id"] for p in hc.match_reward(copy.deepcopy(st), stats)["players"]]
+        assert got == [card(xi[0]), card(subs[0])], got
         # a shootout decides a level score: won on penalties = the win reward
         pen = lambda a, b: {"myTeam": "away", "opponentTeam": "home", "home": {"score": 1, "shootout": b}, "away": {"score": 1, "shootout": a}}
         assert [hc.match_outcome(pen(4, 3)), hc.match_outcome(pen(2, 4)), hc.match_outcome(pen(0, 0))] == [1, -1, 0]
@@ -2782,7 +2855,7 @@ def main():
         assert len(A("log", n=5)["lines"]) <= 5
         # issue #36: the login notice's picture (admin Pengumuman tab -> gamedata/notice.png, served as
         # externalAssets/notice/notice.png); the user's own one is put back afterwards
-        import base64, struct, zlib
+        import base64
         def png(w, h):
             chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
             return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 0, 0, 0, 0))
@@ -2857,6 +2930,15 @@ def main():
         # (issue #36, 2026-11-09: "automatically retry failed downloads") it goes on, waiting 10 s more,
         # doubling, up to 5 min; only TRIES refusals in a row end it
         assert waits == [0, 10, 0, 0, 10, 20, 40, 80, 160, 300] and open(os.path.join(fa.EXT, "crests", "large", "s4.png"), "rb").read() == b"\x89PNG crest"
+        # issue #43 ("where to get crest and uniform?"): the club picker's kit pictures, home/away/third of a club
+        real_index, real_asked = fa.hc.club_index, fa._asked
+        fa.hc.club_index, fa._asked = (lambda: [("Italy", [(31, [47, 48])])]), (lambda pattern: [243, 47])
+        try:
+            u = fa.wanted_uniforms()
+        finally:
+            fa.hc.club_index, fa._asked = real_index, real_asked
+        assert [r for r, _ in u[:4]] == ["uniforms/j0_243.png", "uniforms/j1_243.png", "uniforms/j2_243.png", "uniforms/j0_47.png"]
+        assert len(u) == 9 and u[3][1] == fa.FA + "uniforms/j0_47.png" and "uniforms" in admin.ASSET_KINDS
         tries, fa.TRIES, waits[:] = fa.TRIES, 2, []
         fa.urllib.request.urlopen = answer
         try:
@@ -3260,6 +3342,72 @@ def main():
         hc._save(hc._state() | {"teams": {**hc._state()["teams"], str(hc._default_slot(st)): t}})
         res = next(p for p in t["players"] if p.get("team2"))
         assert body(hc.route(f"/player/{hc.iid(res)}/move/firstteam")("", b"{}"))["result"]
+        # issue #44: Lepas (DELETE /player/<_id>) takes a card away for good, the reply's /coach/me without
+        # it (the player stayed in the list); a starter stays, and a GET is no release
+        t = hc._state()["teams"][str(hc._default_slot(st))]
+        gone = next(p for p in t["players"] if not hc.in_squad(t, p))
+        starter = next(p for p in t["players"] if hc.is_starter(t, p))
+        release = lambda p, m="DELETE": body(hc.route(f"/player/{hc.iid(p)}")("", json.dumps({"_method": m}).encode()))
+        assert release(gone, "GET") == {} and release(starter)["reason"] == "COMMON_PLAYER_INFO_REMOVE_NOTALLOWED"
+        r = release(gone)
+        assert r["result"] and hc.iid(gone) not in {p["_id"] for p in r["resources"][0]["body"]["team"]["players"]}
+        assert len(hc._state()["teams"][str(hc._default_slot(st))]["players"]) == len(t["players"]) - 1
+        assert release(gone) == {"result": False, "reason": "not exists player"}
+        # issue #44: Kontrak pemain (craft) lists the best Legend players; a "Kotak player piece" gives 1-3
+        # pieces of one of them; 10 pieces + a contract + the fee sign his card
+        recipes = body(hc.ENDPOINTS["/mixin/recipes"]("", b""))
+        assert len(recipes) == hc.CRAFT_DEFAULT["count"] and all(r["category"] == "player" for r in recipes.values())
+        rid, r = next(iter(recipes.items()))
+        spid, piece = r["result"]["normal"]["id"], r["materials"][0]["itemid"]
+        assert spid // 1000000 in hc.TC_LEGENDS and hc.on_market(spid) and piece == hc.CRAFT_PIECE + int(rid)
+        assert r["materials"][1] == {"itemid": hc.CRAFT_CONTRACT, "count": 1} and 0 < r["money"]["ep"] < r["result"]["normal"]["price"]
+        st = hc._state(); coach = hc.my_coach(st)
+        coach["items"] = [i for i in coach.get("items", []) if not hc.is_piece(i["itemid"]) and i["itemid"] != hc.CRAFT_CONTRACT]
+        box = hc.inventory_add(coach, hc.CRAFT_BOX, 1); hc._save(st)
+        got = body(hc.route(f"/item/{box['_id']}/use")("", json.dumps({"id": hc.CRAFT_BOX}).encode()))
+        assert got["result"] and hc.is_piece(got["item"]["itemid"]) and 1 <= got["item"]["count"] <= 3
+        assert got["item"]["staticdata"]["type"] == "ITEM_PLAYER_CRAFT" and got["item"]["staticdata"]["spid"] // 1000000 in hc.TC_LEGENDS
+        mine = {i["itemid"]: i for i in hc.coach_me(hc._state(), hc._default_slot(st))["items"]}
+        assert mine[got["item"]["itemid"]]["remains"] == got["item"]["count"] and hc.CRAFT_BOX not in mine
+        cache = body(hc.ENDPOINTS["/static/cache/item"]("", json.dumps({"itemids": [piece]}).encode()))
+        assert cache[str(piece)]["spid"] == spid and cache[str(piece)]["enhance"] == hc.CRAFT_DEFAULT["grade"]
+        mix = lambda rid: body(hc.route(f"/mixin/{rid}")("", json.dumps({"materials": []}).encode()))
+        assert mix(rid)["reason"] == "CRAFTSYSTEM_ERROR_02" and mix("1")["reason"] == "CRAFTSYSTEM_ERROR_03"
+        st = hc._state(); coach = hc.my_coach(st)
+        hc.inventory_add(coach, piece, hc.CRAFT_DEFAULT["pieces"] + 2); contract = hc.inventory_add(coach, hc.CRAFT_CONTRACT, 1)
+        coach["ep"] = r["money"]["ep"] - 1; hc._save(st)
+        assert mix(rid)["reason"] == "CRAFTSYSTEM_ERROR_05"
+        assert body(hc.route(f"/item/{contract['_id']}/use")("", b"{}"))["reason"] == "ITEM_USE_ERROR"  # only Kontrak pemain spends it
+        st = hc._state(); hc.my_coach(st)["ep"] = r["money"]["ep"] + 5; hc._save(st)
+        players = len(hc._state()["teams"][str(hc._default_slot(st))]["players"])
+        done = mix(rid)
+        assert done["result"] and done["results"] == [{"spid": spid, "grade": hc.CRAFT_DEFAULT["grade"]}], done
+        st = hc._state(); coach = hc.my_coach(st); t = st["teams"][str(hc._default_slot(st))]
+        left = {i["itemid"]: i["remains"] for i in coach["items"]}
+        assert coach["ep"] == 5 and hc.CRAFT_CONTRACT not in left and left[piece] >= 2
+        assert len(t["players"]) == players + 1 and t["players"][-1]["spid"] == spid and t["players"][-1]["grade"] == hc.CRAFT_DEFAULT["grade"]
+        assert any(p["spid"] == spid for p in done["resources"][0]["body"]["team"]["players"])
+        # issue #44 ("Can we change the player list in craft system?"): the admin page's Shop tab sets the
+        # list (one card a player, in its order), the pieces, the fee and the grade; reset = the default
+        cr = A("craft")
+        assert not cr["custom"] and len(cr["players"]) == hc.CRAFT_DEFAULT["count"] and cr["fee"] == 5 and cr["pieces"] == 10
+        messi = next(r["spid"] for r in A("search", q="Messi")["rows"] if r["market"])
+        assert refused("craft_set", players=[158023], pieces=4, fee=2, grade=3, count=30)  # season 0: an engine card
+        with hc.closing(hc._db()) as c:  # spid twice, then another card of his: one recipe a player
+            other = c.execute("SELECT spid FROM players WHERE playerid = ? AND spid != ? AND spid >= 1000000",
+                              (spid % 1000000, spid)).fetchone()
+        own = [messi, spid, spid] + ([other[0]] if other else [])
+        cr = A("craft_set", players=own, pieces=4, fee=2.5, grade=3, count=30)
+        assert cr["custom"] and [r["spid"] for r in cr["players"]] == [messi, spid] and cr["fee"] == 2.5
+        rec = body(hc.ENDPOINTS["/mixin/recipes"]("", b""))
+        assert list(rec) == [str(messi % 1000000), str(spid % 1000000)]
+        assert rec[str(messi % 1000000)]["materials"][0]["count"] == 4 and rec[str(messi % 1000000)]["result"]["normal"]["grade"] == 3
+        assert rec[str(messi % 1000000)]["money"]["ep"] == hc.sig3(hc.card_price(messi, 3) * 0.025)
+        assert hc.piece_def(hc.CRAFT_PIECE + messi % 1000000)["enhance"] == 3
+        assert refused("craft_set", players=[1234567], pieces=4, fee=2, grade=3, count=30)  # no such card
+        assert refused("craft_set", players=[], pieces=0, fee=2, grade=3, count=30) and refused("craft_set", players=[], pieces=4, fee=101, grade=3, count=30)
+        assert len(A("craft_set", players=[], pieces=10, fee=5, grade=1, count=12)["players"]) == 12  # the default list, 12 long
+        assert A("craft_set", reset=True)["players"] == A("craft")["players"] and not os.path.isfile(hc.CRAFT_FILE)
         # --- delete a manager: PUT /coach/<slot>/postponed -> "postpone" until hideat (restorable with
         # DELETE /coach/<_id>/postponed), then the slot is free and the club data goes with it
         slot = hc._default_slot(hc._state()); cid = hc.coach_id(slot)

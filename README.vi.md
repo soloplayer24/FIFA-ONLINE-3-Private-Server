@@ -1,4 +1,4 @@
-[![SEASON UPGRADE 25, 26, WC18](docs/season-upgrade-25-26-wc18.svg)](https://www.mediafire.com/file/505f9vtgtkfu69w/FO3ID-Season-25-26-LIVE-WC18-client.rar/file)
+[![SEASON UPGRADE 25, 26, WC18, SERIE A](docs/season-upgrade-25-26-wc18.svg)](https://www.mediafire.com/file/ettm1y9u3s0r3t2/FO3ID-Season-25-26-LIVE-WC18-SerieA-client.zip/file)
 
 # FO3ID Private Server
 
@@ -39,6 +39,16 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
 - Luôn có VIP + ưu đãi phòng máy chính thức (IGR), xóa / khôi phục HLV, thẻ mùa '17.
 - Danh sách sơ đồ (sơ đồ riêng của CLB + 33 sơ đồ phổ biến của game, đọc từ bảng sơ đồ của client) và
   cấp HLV / cầu thủ: EXP sau mỗi trận, cầu thủ LV.1-23 (+1 mọi chỉ số mỗi cấp), HLV LV.1-100.
+- Issue #44: *Lepas* (giải phóng) trong danh sách cầu thủ xóa thẻ vĩnh viễn (trước đây cầu thủ vẫn còn
+  trong danh sách; không áp dụng cho cầu thủ đá chính hoặc khi chỉ còn 18 cầu thủ); cầu thủ dự bị được
+  tung vào sân cũng nhận EXP (dự bị không ra sân thì không); ô phần thưởng của cửa sổ Quest hiển thị ảnh
+  đúng tỷ lệ (trước bị kéo giãn); team color "Red Day Boost" ("Red Devil" bản tiếng Thái) là của
+  Manchester United (thẻ '17 / cầu thủ đang hoặc từng ở CLB), trước đây CLB nào cũng có; danh sách đội
+  hình hiển thị mũi tên phong độ của từng thẻ (tốt nhất đến tệ nhất, đổi mới mỗi ngày lúc 00:00 WIB; chưa
+  kiểm tra phong độ ảnh hưởng gì trong trận). *Kontrak pemain* (craft của FO3) đã chạy: 30 cầu thủ Legend
+  tốt nhất, mỗi người cần 10 mảnh cầu thủ, vật phẩm "Kontrak pemain" (Shop) và 5% giá thẻ bằng EP; "Kotak player
+  piece" (Shop, thẻ thưởng sau trận mặc định; trang admin có thể đặt vào bất kỳ phần thưởng nào) cho 1-3 mảnh của một cầu thủ.
+  Tab Shop của trang admin đổi được danh sách (thẻ bất kỳ), số mảnh, phí và cấp.
 - Âm thanh game và nhạc menu EA Trax. `tools/eatrax_song.py` đặt bài hát của bạn lên đầu, nhưng sau đó
   game bị crash sau mỗi trận (xem lỗi đã biết bên dưới).
 - Trang quản trị web tại http://127.0.0.1:8088/ (EP, cầu thủ, gói, quà, quà hằng ngày, thưởng sau trận, cài đặt trận, kinh tế, chat AI, Cửa hàng, nhật ký)
@@ -192,10 +202,12 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
   lâu có người mua hơn), nên mua rẻ bán đắt sẽ có lãi. Các mẫu có sẵn: Dễ (như trước: Shop miễn phí, giá cố
   định), Thực tế (Shop tính phí theo giá trị các thẻ trong gói, Market biến động, 300.000 EP ban đầu) và Khó
   (giá x2, 100.000 EP). EP nhận sau mỗi trận vẫn được chỉnh ở tab Thưởng sau trận.
-  Khi Shop tính phí, không có cách nào tạo EP từ hư không: phí Nâng cấp bằng giá trị trung bình nó thêm vào
-  (khôi phục trả bằng EP), đề nghị của Tukar và Scout không vượt quá giá trị các thẻ đã đưa, phiếu Mô phỏng
-  giải đấu có giá bằng phần thưởng của một vòng, và với Market biến động, giá gói bằng giá trị các thẻ lúc
-  đắt nhất (+13%), vì gói có thể để dành mở vào bất kỳ ngày nào.
+  Khi Shop tính phí, phiếu Mô phỏng giải đấu có giá bằng phần thưởng của một vòng, và với Market biến động,
+  giá gói bằng giá trị các thẻ lúc đắt nhất (+13%), vì gói có thể để dành mở vào bất kỳ ngày nào. Luật chặt
+  (bật ở Khó) khiến Nâng cấp, Tukar và Scout không tạo EP: phí Nâng cấp bằng giá trị trung bình nó thêm vào
+  (khôi phục trả bằng EP), đề nghị của Tukar và Scout không vượt quá giá trị các thẻ đã đưa. Khi tắt (Dễ,
+  Thực tế) dùng luật gốc của game: phí Nâng cấp 2% giá trị thẻ, khôi phục bằng điểm nâng cấp, đề nghị không
+  giới hạn.
   Vật phẩm không chứa EP (tăng tỉ lệ nâng cấp, điểm nâng cấp, viên EXP, đổi tên hoặc đổi đội) có giá cơ bản
   nhân hệ số giá cầu thủ, nên ở mức Khó giá gấp đôi.
   Thay đổi có hiệu lực ngay cả khi game đang chạy: máy chủ báo game bỏ danh sách Shop nó giữ suốt phiên, nên
@@ -287,7 +299,7 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
 - **Tải ảnh còn thiếu từ trang quản trị** (issue #36): tab Aset (Hình ảnh) tải ảnh mặt cầu thủ (ảnh mùa của từng thẻ và ảnh
   của cầu thủ), logo CLB, logo
   giải đấu và ảnh staff còn thiếu từ fifaaddict.com ở chế độ nền (mỗi lần một loại; dừng và tải tiếp lúc nào cũng
-  được). Tab này chạy `tools/fa_faces.py`, công cụ này giờ nhận thêm `--leagues`. "Default ball" trên màn hình
+  được). Tab này chạy `tools/fa_faces.py`, công cụ này giờ nhận thêm `--leagues` và `--uniforms` (ảnh áo đấu ở màn hình chọn CLB, issue #43). "Default ball" trên màn hình
   cài đặt trận hiện quả bóng EA SPORTS, cờ nhỏ dùng ảnh cờ lớn, và các màn hình Cup có cúp và skin riêng.
   Ảnh cầu thủ fifaaddict không có (hoặc từ chối) sẽ lấy từ FC Online (FO4) (cùng player id của EA; cầu thủ mới của
   server lấy ảnh thẻ FO4 từ fifaaddict), việc quét bao gồm mọi thẻ trong cơ sở dữ liệu, khi bị từ chối sẽ chờ lâu hơn rồi
@@ -368,7 +380,7 @@ Item saya, Gudang bên dưới là tên màn hình trong game, được giữ ng
   cho. *Tạo lại mọi mặt 3D từ ảnh đại diện* làm lại các mặt đã có.
 - **Thế giới FO3 cổ điển** (issue #38): *Dunia game* trong tab Database chọn Hiện đại (CLB AI, phần chọn CLB
   và gói This Season dùng thẻ 26 LIVE, như trước; mùa tự tạo cũng hiện trong tìm kiếm Market) hoặc Cổ điển FO3:
-  mọi CLB dùng đội hình 2017 gốc của FO3, This Season = '17, còn các mùa thêm vào (25 / 26 LIVE, WC18, mùa tự tạo)
+  mọi CLB dùng đội hình 2017 gốc của FO3 (AC Milan, Genoa, Udinese, Bologna, Cagliari và Sampdoria, vốn FO3 ID không có, dùng thẻ FO3 của họ ở mọi năm; issue #43), This Season = '17, còn các mùa thêm vào (25 / 26 LIVE, WC18, mùa tự tạo)
   không có trong gói, Market, giao dịch hay đội hình quản lý ảo: chỉ trang quản trị mới trao được. CLB và bộ sưu
   tập của bạn giữ nguyên, thẻ gốc FO3 không bao giờ bị ghi đè (mùa mới được thêm bên cạnh). Lưu trong
   `gamedata/world.json`; có hiệu lực sau khi khởi động lại (`play.bat`).
@@ -450,6 +462,15 @@ Chưa làm: chơi online với người khác (xếp hạng PvP, giao hữu, Kin
 - Tùy chọn: ffmpeg (chỉ cho `tools/eatrax_song.py`).
 
 ## Cài đặt
+
+**Dễ nhất: setup.exe.** Đóng game rồi chạy `FO3ID-Server-Setup-<phiên bản>.exe`: nó hỏi thư mục game
+FO3 ID, cài server kèm Python riêng (vào `C:\FO3ID Server`), tạo chứng chỉ, thêm dòng hosts, trích xuất
+cơ sở dữ liệu cầu thủ, vá game (`installer/setup_pc.py`, nhật ký ở `installer/setup.log`) và tạo lối tắt
+**FO3ID** trên màn hình: nhấp đúp để chơi. Bên trong không có file game nên game phải được cài sẵn; mùa
+FO4, sự nghiệp câu lạc bộ và khuôn mặt 3D có được nhờ các công cụ bên dưới. Gỡ cài đặt sẽ trả lại file
+gốc của game. Cách tạo: `python installer/build.py` (cần Inno Setup 6; Python và các gói chỉ tải một lần).
+
+Cài thủ công:
 
 1. Trích xuất cơ sở dữ liệu cầu thủ từ client của bạn:
    `python extract_fifadb.py D:\FO3ID\32795` → `gamedata/fifadb.sqlite`.
